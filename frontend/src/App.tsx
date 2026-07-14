@@ -19,6 +19,7 @@ const TABS: { id: View; label: string }[] = [
   { id: "compare", label: "Compare" },
   { id: "network", label: "Network" },
   { id: "pdf", label: "PDF" },
+  { id: "settings", label: "Settings" },
 ];
 
 const SKELETON: VersionDetail = {
@@ -120,9 +121,6 @@ export default function App() {
         <button className="accent branch-btn" onClick={() => setView("tailor")} disabled={empty}>
           <GitBranchIcon size={14} /> <span className="nb-text">New branch</span>
         </button>
-        <button className={"icon-btn" + (view === "settings" ? " active-icon" : "")} title="Settings" onClick={() => setView("settings")}>
-          <GearIcon size={16} />
-        </button>
       </div>
 
       <div className="layout">
@@ -153,7 +151,7 @@ export default function App() {
           <nav className="tabs">
             {TABS.map((t) => (
               <button key={t.id} className={"tab" + (view === t.id ? " active" : "")} onClick={() => setView(t.id)}>
-                {t.label}
+                {t.id === "settings" && <GearIcon size={14} />}{t.label}
               </button>
             ))}
           </nav>
