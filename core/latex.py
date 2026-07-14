@@ -177,13 +177,13 @@ def render_education(entries: list, title: str = "Education") -> str:
 
 
 def render_bullets(title: str, items: list) -> str:
+    items = [i for i in items if i]  # drop empty rows
     if not items:
         return ""
-    out = [f"\n\\section{{{tex_escape(title)}}}", r"\resumeSubHeadingListStart", r"\resumeItemListStart"]
+    out = [f"\n\\section{{{tex_escape(title)}}}", r"\begin{itemize}[leftmargin=0.15in]"]
     for item in items:
-        out.append(rf"\resumeItem{{{tex_escape(item)}}}")
-    out.append(r"\resumeItemListEnd")
-    out.append(r"\resumeSubHeadingListEnd")
+        out.append(rf"    \item \small {tex_escape(item)}")
+    out.append(r"\end{itemize}\vspace{-4pt}")
     return "\n".join(out)
 
 

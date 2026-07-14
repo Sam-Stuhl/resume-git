@@ -9,7 +9,7 @@ import pytest
 from core import schema
 from core.diff import diff_lines, summarize_changes
 from core.latex import build_latex, tex_escape
-from core.pdf import compute_archive_name, compute_pdf_name, pdflatex_available
+from core.pdf import compile_pdf_bytes, compute_archive_name, compute_pdf_name, pdflatex_available
 from core.util import hash_json
 
 SAMPLE = json.loads(
@@ -55,12 +55,32 @@ def test_normalize_legacy_to_sections():
 
 
 def test_bullets_section_compiles():
-    data = {"personal": {"name": "A"}, "sections": [
+    data = {"personal": {"name": "Jordan Sample"}, "sections": [
         {"type": "bullets", "title": "Certifications", "items": ["AWS Certified", "CKA"]},
     ]}
     schema.validate(data)
     tex = build_latex(data)
     assert "Certifications" in tex and "AWS Certified" in tex
+    if pdflatex_available():
+        pdf = compile_pdf_bytes(data)
+        assert pdf[:4] == b"%PDF"
+
+
+def test_all_section_types_compile():
+    # A resume exercising every type must produce a valid PDF, not just valid text.
+    data = {"personal": {"name": "Jordan Sample", "email": "j@x.com"}, "sections": [
+        {"type": "text", "title": "Summary", "text": "Engineer."},
+        {"type": "roles", "title": "Experience", "entries": [
+            {"title": "SWE", "organization": "Acme", "bullets": ["Built things"]}]},
+        {"type": "projects", "title": "Projects", "entries": [
+            {"name": "Thing", "stack": "Py", "bullets": ["Did it"]}]},
+        {"type": "skills", "title": "Skills", "groups": [{"category": "Lang", "items": "Python"}]},
+        {"type": "education", "title": "Education", "entries": [{"school": "State U"}]},
+        {"type": "bullets", "title": "Awards", "items": ["Dean's List"]},
+    ]}
+    schema.validate(data)
+    if pdflatex_available():
+        assert compile_pdf_bytes(data)[:4] == b"%PDF"
 
 
 def test_tex_escape_specials():
