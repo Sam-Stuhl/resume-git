@@ -1,0 +1,38 @@
+# ── Personal data — NEVER commit (this is a public, code-only repo) ──
+resume_data/
+data/
+*.db
+*.pdf
+resume_data.json
+tmp*.json
+I-GenieDayDescCompiled.md
+
+# ── Secrets ──
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# ── Python ──
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+
+# ── Node / frontend ──
+node_modules/
+frontend/dist/
+frontend/node_modules/
+*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts
+
+# ── OS / editor ──
+.DS_Store
+.idea/
+.vscode/

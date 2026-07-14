@@ -1,0 +1,62 @@
+{
+  "personal": {
+    "name": "Jordan Sample",
+    "email": "jordan.sample@example.com",
+    "phone": "(555) 123-4567",
+    "github": "github.com/jordansample",
+    "linkedin": "linkedin.com/in/jordansample"
+  },
+  "summary": "Software engineer with experience building data pipelines and web applications in Python and TypeScript. Focused on reliable systems, clean APIs, and measurable impact.",
+  "experience": [
+    {
+      "title": "Software Engineering Intern",
+      "organization": "Acme Analytics",
+      "location": "Remote",
+      "start_date": "Jun 2025",
+      "end_date": "Aug 2025",
+      "bullets": [
+        "Built a data ingestion pipeline in Python that processed 2M records/day, cutting nightly batch time by 35%.",
+        "Designed a REST (RESTful) API with FastAPI serving 40+ endpoints consumed by the analytics dashboard.",
+        "Added integration tests that raised coverage from 48% to 82% and caught 12 regressions before release."
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "LeafNote",
+      "stack": "TypeScript, React, SQLite",
+      "bullets": [
+        "Built a note-taking web app with offline sync used by 300+ users.",
+        "Implemented full-text search over 10k notes with sub-100ms query latency."
+      ]
+    }
+  ],
+  "leadership": [
+    {
+      "title": "Team Lead",
+      "organization": "University Coding Club",
+      "location": "Springfield, USA",
+      "start_date": "Sep 2024",
+      "end_date": "Present",
+      "bullets": [
+        "Organized weekly workshops for 50+ members on Git, Python, and web development."
+      ]
+    }
+  ],
+  "skills": {
+    "Languages": "Python, TypeScript, SQL, Java",
+    "Frameworks & Libraries": "FastAPI, React, Flask, pytest",
+    "Cloud & Data": "PostgreSQL, Docker, AWS (Amazon Web Services)",
+    "Developer Tools": "Git, Linux, VS Code"
+  },
+  "education": [
+    {
+      "school": "State University",
+      "location": "Springfield, USA",
+      "gpa": "3.8",
+      "start_date": "Sep 2023",
+      "end_date": "May 2027",
+      "coursework": "Data Structures, Algorithms, Databases, Operating Systems"
+    }
+  ]
+}

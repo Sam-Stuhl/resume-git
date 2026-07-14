@@ -1,0 +1,25 @@
+# console.toml for resume-manager — deployed via Sam-Stuhl/console.
+# Validated on every build before anything touches Docker.
+
+# Runtime secrets, by NAME only (values live in the console, never in git):
+#   DATABASE_URL             Neon Postgres connection string (required)
+#   CF_ACCESS_TEAM_DOMAIN    e.g. https://yourteam.cloudflareaccess.com (JWT verify)
+#   CF_ACCESS_AUD            Cloudflare Access application AUD tag (JWT verify)
+secrets = ["DATABASE_URL", "CF_ACCESS_TEAM_DOMAIN", "CF_ACCESS_AUD"]
+
+[app]
+name = "resume-manager"
+subdomain = "resume"       # serves at resume.samstuhl.com
+port = 8080
+
+[health]
+path = "/health"
+timeout = 90               # first boot creates tables
+
+[resources]
+memory = "512m"
+cpus = 1.0
+
+[env]
+# Non-secret runtime config.
+# DEFAULT_MODEL = "claude-sonnet-5"
