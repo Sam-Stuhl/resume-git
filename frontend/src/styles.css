@@ -185,9 +185,10 @@ pre.diff { margin: 0; font-family: var(--mono); font-size: 12px; line-height: 1.
 .compare-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .compare-arrow { color: var(--muted); font-family: var(--mono); font-size: 16px; }
 
-/* ── Live git-graph (Network tab) ── */
-.git-graph-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); max-width: 760px; }
-.git-graph { width: max-content; min-width: 100%; }
+/* ── Live git-graph (Network tab) — fills the whole view ── */
+.net-fill { flex: 1; min-height: 0; overflow: auto; }
+.git-graph-wrap { width: max-content; min-width: 100%; padding: 4px 0; }
+.git-graph { display: flex; flex-direction: column; }
 .grow { display: flex; align-items: stretch; cursor: pointer; border-left: 2px solid transparent; position: relative; transition: background .1s; }
 .grow + .grow { border-top: 1px solid color-mix(in srgb, var(--border) 45%, transparent); }
 .grow:hover { background: var(--panel-2); }

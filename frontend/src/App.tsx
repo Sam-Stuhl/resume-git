@@ -169,15 +169,20 @@ export default function App() {
             ) : (
               <div className="content"><p className="muted">Loading…</p></div>
             )
+          ) : view === "network" ? (
+            !empty ? (
+              <div className="net-fill">
+                <NetworkGraph versions={versions} current={current} selected={selected} onSelect={setSelected} onOpen={setModalVersion} />
+              </div>
+            ) : (
+              <div className="content"><p className="muted">No commits yet.</p></div>
+            )
           ) : (
             <div className="content">
               {view === "tailor" && me && <BranchFlow me={me} onCreated={onCommitted} />}
               {view === "pdf" && selected != null && <PdfPreview version={selected} />}
               {view === "compare" && !empty && selected != null && (
                 <Compare versions={versions} selected={selected} />
-              )}
-              {view === "network" && !empty && (
-                <NetworkGraph versions={versions} current={current} selected={selected} onSelect={setSelected} onOpen={setModalVersion} />
               )}
               {view === "settings" && me && (
                 <>
