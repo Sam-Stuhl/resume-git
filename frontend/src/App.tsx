@@ -113,7 +113,7 @@ export default function App() {
           <MenuIcon size={16} />
         </button>
         <span className="wordmark"><GitBranchIcon size={16} className="wm-ico" /> resume-git</span>
-        <span className={"branch-pill " + (onMain ? "main" : "branch")}>
+        <span className={"branch-pill " + (onMain ? "on-main" : "on-branch")}>
           <GitBranchIcon size={12} /> {headMeta ? branchName(headMeta) : "main"}
         </span>
         {current != null && <span className="head-badge">HEAD {ref(current)}</span>}

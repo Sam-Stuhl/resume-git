@@ -105,8 +105,8 @@ code { font-family: var(--mono); font-size: .92em; background: var(--panel-2); p
   max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .branch-pill svg { flex: none; }
-.branch-pill.main { color: var(--commit); }
-.branch-pill.branch { color: var(--branch); }
+.branch-pill.on-main { color: var(--commit); }
+.branch-pill.on-branch { color: var(--branch); }
 .head-badge {
   font-size: 10px; font-weight: 700; color: var(--commit); white-space: nowrap; flex: none;
   border: 1px solid color-mix(in srgb, var(--commit) 50%, transparent);
@@ -265,7 +265,11 @@ textarea.raw { width: 100%; min-height: 60vh; }
 /* ── Workbench 3-pane + commit bar ── */
 .edit-fill, .wb-wrap { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .workbench { display: grid; grid-template-columns: 1fr 1fr; gap: 0; flex: 1; min-height: 0; }
-.wb-editor { display: flex; flex-direction: column; overflow: hidden; padding: 16px; border-right: 1px solid var(--border); min-height: 0; }
+.wb-editor { display: flex; flex-direction: column; overflow: hidden; padding: 16px; min-height: 0; }
+/* Draggable divider between panes (a 6px grid track). */
+.wb-resizer { position: relative; cursor: col-resize; touch-action: none; }
+.wb-resizer::after { content: ""; position: absolute; inset: 0 2px; background: var(--border); transition: background .12s; }
+.wb-resizer:hover::after, .wb-resizer:active::after { background: var(--accent); }
 .resume-editor { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .ed-scroll { flex: 1; min-height: 0; overflow: auto; }
 .wb-preview { overflow: hidden; padding: 16px; display: flex; flex-direction: column; }
@@ -279,8 +283,8 @@ textarea.raw { width: 100%; min-height: 60vh; }
 .wb-chat-toggle { font-size: 12px; padding: 4px 12px; }
 .wb-chat-toggle.on { background: var(--panel-2); color: var(--text); border-color: var(--accent); }
 /* On wide screens the chat is a third column, shown only when toggled open. */
-.wb-chat { display: none; min-height: 0; overflow: hidden; border-left: 1px solid var(--border); }
-.workbench.chat-open { grid-template-columns: 1fr 1fr 380px; }
+.wb-chat { display: none; min-height: 0; overflow: hidden; }
+.workbench.chat-open { grid-template-columns: 1fr 6px 1fr 6px 380px; }
 .workbench.chat-open .wb-chat { display: flex; }
 
 /* ── Resume Copilot chat ── */
@@ -325,8 +329,7 @@ textarea.raw { width: 100%; min-height: 60vh; }
   .pane-toggle .ed-modebar { margin-bottom: 0; }
   .wb-chat-toggle { display: none; } /* the segmented Copilot tab replaces it */
   .workbench, .workbench.chat-open { grid-template-columns: 1fr; }
-  .wb-editor { border-right: none; }
-  .wb-chat { border-left: none; }
+  .wb-resizer { display: none; } /* no dragging when panes stack */
   .workbench.pane-editor .wb-preview, .workbench.pane-editor .wb-chat { display: none; }
   .workbench.pane-preview .wb-editor, .workbench.pane-preview .wb-chat { display: none; }
   .workbench.pane-chat .wb-editor, .workbench.pane-chat .wb-preview { display: none; }
