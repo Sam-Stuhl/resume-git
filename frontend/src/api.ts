@@ -61,6 +61,26 @@ export const api = {
 
   sessionPrompt: () => req<{ prompt: string }>("/api/prompts/session"),
 
+  // Compile unsaved data to a PDF blob for the live preview.
+  previewPdf: async (data: unknown): Promise<Blob> => {
+    const res = await fetch("/api/preview/pdf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ data }),
+    });
+    if (!res.ok) {
+      let detail: unknown;
+      try {
+        detail = (await res.json()).detail;
+      } catch {
+        detail = res.statusText;
+      }
+      throw new ApiError(res.status, detail);
+    }
+    return res.blob();
+  },
+
   importBundle: (
     bundle: { versions: unknown[]; current_version?: number | null },
     replace: boolean

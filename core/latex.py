@@ -76,11 +76,12 @@ PREAMBLE = r"""
 
 
 def render_header(personal: dict) -> str:
-    name = tex_escape(personal["name"])
-    email = tex_escape(personal["email"])
-    phone = tex_escape(personal["phone"])
-    github = personal["github"]
-    linkedin = personal["linkedin"]
+    # Tolerant of partial data so the live preview never crashes mid-edit.
+    name = tex_escape(personal.get("name", ""))
+    email = tex_escape(personal.get("email", ""))
+    phone = tex_escape(personal.get("phone", ""))
+    github = personal.get("github", "")
+    linkedin = personal.get("linkedin", "")
     return (
         r"\begin{center}" + "\n"
         + rf"    \textbf{{\Huge \scshape {name}}} \\ \vspace{{1pt}}" + "\n"

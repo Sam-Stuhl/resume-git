@@ -277,6 +277,23 @@ async def version_pdf(
     return _pdf_response(pdf, compute_archive_name(row.data, v))
 
 
+@router.post("/preview/pdf")
+async def preview_pdf(
+    body: schemas.PreviewIn,
+    user: User = Depends(get_current_user),
+):
+    """Compile arbitrary (unsaved) resume data to a PDF for the live preview.
+
+    Lenient by design: renders whatever's there so the preview updates mid-edit.
+    Requires only a ``personal`` object; commit-time validation is stricter.
+    """
+    data = body.data
+    if not isinstance(data, dict) or not isinstance(data.get("personal"), dict):
+        raise HTTPException(422, {"error": "resume must have a 'personal' object"})
+    pdf = await _compile(data)
+    return _pdf_response(pdf, "preview.pdf")
+
+
 @router.get("/pdf/current")
 async def current_pdf(
     user: User = Depends(get_current_user),
