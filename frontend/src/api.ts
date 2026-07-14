@@ -88,7 +88,7 @@ export const api = {
     return res.blob();
   },
 
-  // ── Resume Copilot chat ──
+  // ── Resume Assistant chat ──
   chatHistory: (thread: string) =>
     req<ChatMessage[]>(`/api/chat/${encodeURIComponent(thread)}`),
   clearChat: (thread: string) =>

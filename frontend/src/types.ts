@@ -70,7 +70,7 @@ export interface Resume {
   sections?: Section[];
 }
 
-// ── Resume Copilot chat ──
+// ── Resume Assistant chat ──
 export interface SectionChange {
   key: string;
   title: string;

@@ -7,7 +7,7 @@ import { GitBranchIcon } from "./icons";
 import { DiffLines, Summary } from "./DiffView";
 
 /**
- * Resume Copilot — a streaming chat docked in the Workbench. Claude advises and,
+ * Resume Assistant — a streaming chat docked in the Workbench. Claude advises and,
  * when asked for a concrete change, returns a proposal the user reviews as a diff
  * and applies (staged into the editor) or turns into a new branch.
  */
@@ -93,7 +93,7 @@ export function ChatPanel({
   if (!me.ai_enabled) {
     return (
       <div className="chatpanel">
-        <div className="chat-head"><span className="chat-title">Copilot</span></div>
+        <div className="chat-head"><span className="chat-title">Assistant</span></div>
         <div className="chat-empty">
           <p className="muted">
             Add a Claude API key or a Claude Code token in Settings to chat with your
@@ -108,7 +108,7 @@ export function ChatPanel({
   return (
     <div className="chatpanel">
       <div className="chat-head">
-        <span className="chat-title">Copilot</span>
+        <span className="chat-title">Assistant</span>
         <span className="chat-thread">{threadKey}</span>
         <span className="spacer" />
         {messages.length > 0 && (
@@ -166,7 +166,7 @@ export function ChatPanel({
         <textarea
           rows={2}
           value={input}
-          placeholder="Message Copilot…  (Enter to send, Shift+Enter for newline)"
+          placeholder="Message the assistant…  (Enter to send, Shift+Enter for newline)"
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }

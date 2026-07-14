@@ -278,7 +278,7 @@ textarea.raw { width: 100%; min-height: 60vh; }
 .commit-bar input { flex: 1; max-width: 340px; }
 .dirty-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--active); flex: none; }
 
-/* ── Workbench toolbar + Copilot toggle ── */
+/* ── Workbench toolbar + Assistant toggle ── */
 .wb-toolbar { display: flex; align-items: center; padding: 8px 16px 0; }
 .wb-chat-toggle { font-size: 12px; padding: 4px 12px; }
 .wb-chat-toggle.on { background: var(--panel-2); color: var(--text); border-color: var(--accent); }
@@ -287,7 +287,7 @@ textarea.raw { width: 100%; min-height: 60vh; }
 .workbench.chat-open { grid-template-columns: 1fr 6px 1fr 6px 380px; }
 .workbench.chat-open .wb-chat { display: flex; }
 
-/* ── Resume Copilot chat ── */
+/* ── Resume Assistant chat ── */
 .chatpanel { display: flex; flex-direction: column; flex: 1; min-height: 0; width: 100%; }
 .chat-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
 .chat-title { font-weight: 600; font-size: 13px; }
@@ -323,11 +323,11 @@ textarea.raw { width: 100%; min-height: 60vh; }
 
 /* ── Responsive (kept last so it wins the cascade) ── */
 @media (max-width: 900px) {
-  /* One pane at a time, switched by the Editor/Preview/Copilot toggle. */
+  /* One pane at a time, switched by the Editor/Preview/Assistant toggle. */
   .pane-toggle { display: block; }
   .wb-toolbar { padding: 12px 16px 0; }
   .pane-toggle .ed-modebar { margin-bottom: 0; }
-  .wb-chat-toggle { display: none; } /* the segmented Copilot tab replaces it */
+  .wb-chat-toggle { display: none; } /* the segmented Assistant tab replaces it */
   .workbench, .workbench.chat-open { grid-template-columns: 1fr; }
   .wb-resizer { display: none; } /* no dragging when panes stack */
   .workbench.pane-editor .wb-preview, .workbench.pane-editor .wb-chat { display: none; }

@@ -30,7 +30,7 @@ function Resizer({ onDrag }: { onDrag: (dx: number) => void }) {
 
 /**
  * The build-first Workbench: continuous editor + live PDF preview + a
- * context-aware commit bar, plus the Resume Copilot chat. Committing on a base
+ * context-aware commit bar, plus the Resume Assistant chat. Committing on a base
  * commit writes a new base (main); on a tailored branch it refines that branch.
  */
 export function Workbench({ detail, me, onCommitted, onOpenSettings }: {
@@ -117,16 +117,16 @@ export function Workbench({ detail, me, onCommitted, onOpenSettings }: {
           <div className="ed-modebar">
             <button className={"seg" + (pane === "editor" ? " on" : "")} onClick={() => setPane("editor")}>Editor</button>
             <button className={"seg" + (pane === "preview" ? " on" : "")} onClick={() => setPane("preview")}>Preview</button>
-            <button className={"seg" + (pane === "chat" ? " on" : "")} onClick={() => setPane("chat")}>Copilot</button>
+            <button className={"seg" + (pane === "chat" ? " on" : "")} onClick={() => setPane("chat")}>Assistant</button>
           </div>
         </div>
         <span className="spacer" />
         <button
           className={"wb-chat-toggle" + (chatOpen ? " on" : "")}
           onClick={() => setChatOpen((o) => !o)}
-          title="Toggle Resume Copilot"
+          title="Toggle Resume Assistant"
         >
-          Copilot
+          Assistant
         </button>
       </div>
       <div
