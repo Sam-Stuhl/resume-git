@@ -3,9 +3,9 @@ import { api, ApiError } from "./api";
 import type { Me, VersionDetail, VersionMeta } from "./types";
 import { BranchRail } from "./components/BranchRail";
 import { Workbench } from "./components/Workbench";
-import { TailorPanel } from "./components/TailorPanel";
+import { TailorFlow } from "./components/TailorFlow";
 import { PdfPreview } from "./components/PdfPreview";
-import { DiffPanel } from "./components/DiffPanel";
+import { Compare } from "./components/Compare";
 import { Settings } from "./components/Settings";
 import { ImportPanel } from "./components/ImportPanel";
 import { branchName, ref } from "./lib/git";
@@ -157,10 +157,10 @@ export default function App() {
             )
           ) : (
             <div className="content">
-              {view === "tailor" && me && <TailorPanel me={me} onSaved={onCommitted} />}
+              {view === "tailor" && me && <TailorFlow me={me} onCreated={onCommitted} />}
               {view === "pdf" && selected != null && <PdfPreview version={selected} />}
               {view === "compare" && !empty && selected != null && (
-                <DiffPanel versions={versions} selected={selected} />
+                <Compare versions={versions} selected={selected} />
               )}
               {view === "network" && (
                 <div className="card">
