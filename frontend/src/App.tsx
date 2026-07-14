@@ -7,6 +7,7 @@ import { TailorPanel } from "./components/TailorPanel";
 import { PdfPreview } from "./components/PdfPreview";
 import { DiffPanel } from "./components/DiffPanel";
 import { Settings } from "./components/Settings";
+import { ImportPanel } from "./components/ImportPanel";
 
 type Tab = "edit" | "tailor" | "pdf" | "diff" | "settings";
 
@@ -116,14 +117,22 @@ export default function App() {
               (detail ? (
                 <Editor detail={detail} onSaved={onSaved} />
               ) : (
-                <EmptyEditor onSaved={onSaved} />
+                <>
+                  {empty && <ImportPanel onImported={() => refresh()} />}
+                  <EmptyEditor onSaved={onSaved} />
+                </>
               ))}
             {tab === "tailor" && me && <TailorPanel me={me} onSaved={onSaved} />}
             {tab === "pdf" && selected != null && <PdfPreview version={selected} />}
             {tab === "diff" && !empty && selected != null && (
               <DiffPanel versions={versions} selected={selected} />
             )}
-            {tab === "settings" && me && <Settings me={me} onChange={async () => setMe(await api.me())} />}
+            {tab === "settings" && me && (
+              <>
+                <Settings me={me} onChange={async () => setMe(await api.me())} />
+                <ImportPanel onImported={() => refresh()} />
+              </>
+            )}
           </div>
         </main>
       </div>

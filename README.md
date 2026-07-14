@@ -63,6 +63,20 @@ Run the tests with `pytest` (the PDF test auto-skips if `pdflatex` is absent).
 5. One-time: import your existing CLI data —
    `DATABASE_URL=<neon-url> python migrate_import.py you@example.com`.
 
+## Importing from the CLI
+
+The legacy CLI's version history transfers in via a bundle file (no DB URL or
+Python env needed on the web side):
+
+```bash
+python export_cli.py          # reads resume_data/, writes resume_export.json
+```
+
+Then in the web app open **Settings → Import from CLI** (or the Import panel
+shown when the account is empty) and upload `resume_export.json`. Every version
+comes across with its labels, base/tailor flags, fork lineage, and the current
+pointer. (Alternatively, `migrate_import.py` writes straight to Postgres.)
+
 ## JSON schema
 
 ```json

@@ -73,3 +73,29 @@ async def test_schema_rejection(client):
 async def test_tailor_requires_base(client):
     r = await client.post("/api/tailor", json={"data": SAMPLE, "label": "t"})
     assert r.status_code == 400
+
+
+async def test_import_bundle(client):
+    bundle = {
+        "current_version": 2,
+        "versions": [
+            {"version": 1, "label": "base", "is_base": True, "forked_from": None,
+             "json_hash": "x", "data": SAMPLE},
+            {"version": 2, "label": "t", "is_base": False, "forked_from": 1,
+             "json_hash": "y", "data": SAMPLE},
+        ],
+    }
+    # empty account -> imports
+    r = await client.post("/api/import", json={**bundle, "replace": False})
+    assert r.status_code == 200 and r.json()["imported"] == 2
+    assert len((await client.get("/api/versions")).json()) == 2
+    assert (await client.get("/api/versions/current")).json()["version"] == 2
+
+    # non-empty without replace -> 409
+    r = await client.post("/api/import", json={**bundle, "replace": False})
+    assert r.status_code == 409 and r.json()["detail"]["error"] == "account_not_empty"
+
+    # replace -> clean re-import, still 2 (no duplicates)
+    r = await client.post("/api/import", json={**bundle, "replace": True})
+    assert r.status_code == 200
+    assert len((await client.get("/api/versions")).json()) == 2

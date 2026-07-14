@@ -200,6 +200,24 @@ async def tailor_preview(
     )
 
 
+@router.post("/import")
+async def import_data(
+    body: schemas.ImportIn,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    from core.schema import SchemaError
+    try:
+        n = await services.import_bundle(
+            session, user.id, body.versions, body.current_version, body.replace
+        )
+    except services.AlreadyHasDataError as e:
+        raise HTTPException(409, {"error": "account_not_empty", "count": e.count})
+    except SchemaError as e:
+        raise HTTPException(422, {"problems": e.problems})
+    return {"imported": n}
+
+
 @router.post("/versions/{v}/restore", response_model=schemas.VersionMeta)
 async def restore(
     v: int,

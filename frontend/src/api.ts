@@ -60,6 +60,19 @@ export const api = {
   diff: (a: number, b: number) => req<DiffOut>(`/api/versions/${a}/diff/${b}`),
 
   sessionPrompt: () => req<{ prompt: string }>("/api/prompts/session"),
+
+  importBundle: (
+    bundle: { versions: unknown[]; current_version?: number | null },
+    replace: boolean
+  ) =>
+    req<{ imported: number }>("/api/import", {
+      method: "POST",
+      body: JSON.stringify({
+        versions: bundle.versions,
+        current_version: bundle.current_version ?? null,
+        replace,
+      }),
+    }),
 };
 
 export const pdfUrl = {

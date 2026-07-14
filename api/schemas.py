@@ -63,3 +63,9 @@ class SettingsIn(BaseModel):
 
 class ApiKeyIn(BaseModel):
     api_key: str
+
+
+class ImportIn(BaseModel):
+    versions: list[dict]
+    current_version: int | None = None
+    replace: bool = False
