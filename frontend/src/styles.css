@@ -178,3 +178,35 @@ pre.diff { margin: 0; font-family: var(--mono); font-size: 12px; line-height: 1.
 .summary li { margin: 2px 0; }
 
 iframe.pdf { width: 100%; height: 100%; min-height: 70vh; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; }
+
+/* ── Section editor ── */
+.ed-modebar { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 14px; }
+.seg { border: none; border-radius: 0; background: var(--panel); color: var(--muted); padding: 5px 12px; }
+.seg.on { background: var(--panel-2); color: var(--text); font-weight: 600; }
+.editor { max-width: 720px; }
+.ed-section { margin-bottom: 20px; }
+.ed-h { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.ef { display: block; margin-bottom: 8px; }
+.ef-k { display: block; font-size: 11px; color: var(--muted); margin-bottom: 3px; text-transform: uppercase; letter-spacing: .03em; }
+.ef input, .ef textarea { width: 100%; }
+.frow { display: flex; gap: 8px; align-items: flex-start; }
+.frow > * { flex: 1; min-width: 0; }
+.bullets { margin-top: 2px; }
+.bullet-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+.bullet-row input { flex: 1; }
+.grip { cursor: grab; color: var(--faint); user-select: none; font-size: 13px; }
+.mini { padding: 3px 8px; font-size: 11px; }
+.mini.add, .add-entry { color: var(--commit); border-style: dashed; background: none; }
+.add-entry { width: 100%; margin-top: 4px; }
+.entry-card { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; background: var(--panel); }
+.entry-head { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; }
+textarea.raw { width: 100%; min-height: 60vh; }
+
+/* ── Workbench 3-pane + commit bar ── */
+.workbench { display: grid; grid-template-columns: 1fr 1fr; gap: 0; height: 100%; }
+.wb-editor { overflow: auto; padding: 16px; border-right: 1px solid var(--border); }
+.wb-preview { overflow: hidden; padding: 16px; display: flex; flex-direction: column; }
+.commit-bar { display: flex; align-items: center; gap: 10px; padding: 8px 16px; border-top: 1px solid var(--border); background: var(--panel); }
+.commit-bar .hint { color: var(--faint); font-size: 12px; }
+.commit-bar input { flex: 1; max-width: 340px; }
+.dirty-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--active); flex: none; }

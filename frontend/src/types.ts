@@ -33,3 +33,28 @@ export interface TailorPreview {
   diff: DiffLine[];
   summary: string[];
 }
+
+// ── Resume content shape (edited by the section forms) ──
+export interface Personal {
+  name?: string; email?: string; phone?: string; github?: string; linkedin?: string;
+}
+export interface Role {
+  title?: string; organization?: string; location?: string;
+  start_date?: string; end_date?: string; bullets?: string[];
+}
+export interface Project {
+  name?: string; stack?: string; bullets?: string[];
+}
+export interface Education {
+  school?: string; location?: string; gpa?: string;
+  start_date?: string; end_date?: string; coursework?: string;
+}
+export interface Resume {
+  personal?: Personal;
+  summary?: string;
+  experience?: Role[];
+  projects?: Project[];
+  leadership?: Role[];
+  skills?: Record<string, string>;
+  education?: Education[];
+}
