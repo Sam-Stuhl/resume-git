@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import type { Resume } from "../../types";
 import { SectionEditor } from "./SectionEditor";
 
+const RawJsonEditor = lazy(() => import("./RawJsonEditor"));
+
 /**
  * The center editor: continuous section forms with a raw-JSON escape hatch.
- * Controlled — the working copy lives in the parent (the Workbench).
+ * The raw view is a real code editor (CodeMirror) lazy-loaded on demand.
  */
 export function ResumeEditor({ value, onChange }: { value: Resume; onChange: (r: Resume) => void }) {
   const [mode, setMode] = useState<"form" | "raw">("form");
@@ -37,10 +39,12 @@ export function ResumeEditor({ value, onChange }: { value: Resume; onChange: (r:
       {mode === "form" ? (
         <SectionEditor value={value} onChange={onChange} />
       ) : (
-        <>
-          <textarea className="raw" rows={26} value={raw} onChange={(e) => onRaw(e.target.value)} spellCheck={false} />
-          {err && <p className="err">{err}</p>}
-        </>
+        <div className="cm-wrap">
+          <Suspense fallback={<p className="muted">Loading editor…</p>}>
+            <RawJsonEditor value={raw} onChange={onRaw} />
+          </Suspense>
+          {err && <p className="err" style={{ marginTop: 8 }}>{err}</p>}
+        </div>
       )}
     </div>
   );

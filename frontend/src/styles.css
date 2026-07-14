@@ -236,6 +236,9 @@ iframe.pdf { width: 100%; height: 100%; min-height: 70vh; border: 1px solid var(
 .entry-card { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; background: var(--panel); }
 .entry-head { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; }
 textarea.raw { width: 100%; min-height: 60vh; }
+.cm-wrap .cm-editor { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; font-size: 12.5px; }
+.cm-wrap .cm-editor.cm-focused { outline: none; border-color: var(--accent); }
+.cm-wrap .cm-gutters { border-radius: 8px 0 0 8px; }
 
 /* ── Flexible sections: headers-with-a-rule, like Personal ── */
 .sec-head { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
