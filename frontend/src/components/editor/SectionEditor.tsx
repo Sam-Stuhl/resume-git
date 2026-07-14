@@ -157,7 +157,7 @@ export function SectionEditor({ value, onChange }: { value: Resume; onChange: (r
 
       {sections.map((sec, i) => (
         <section
-          className="sec-card"
+          className="ed-section"
           key={i}
           onDragOver={(e) => e.preventDefault()}
           onDrop={() => { if (from.current != null) move(from.current, i); from.current = null; }}
@@ -165,10 +165,12 @@ export function SectionEditor({ value, onChange }: { value: Resume; onChange: (r
           <div className="sec-head">
             <span className="grip" draggable onDragStart={() => (from.current = i)} title="drag to reorder">⠿</span>
             <input className="sec-title" value={sec.title} onChange={(e) => update(i, { title: e.target.value })} />
-            <span className="type-badge">{sec.type}</span>
-            <button className="mini" title="move up" onClick={() => move(i, i - 1)}>▲</button>
-            <button className="mini" title="move down" onClick={() => move(i, i + 1)}>▼</button>
-            <button className="mini" title="remove section" onClick={() => setSections(sections.filter((_, j) => j !== i))}>✕</button>
+            <span className="sec-actions">
+              <span className="type-badge">{sec.type}</span>
+              <button className="mini ghost" title="move up" onClick={() => move(i, i - 1)}>▲</button>
+              <button className="mini ghost" title="move down" onClick={() => move(i, i + 1)}>▼</button>
+              <button className="mini ghost" title="remove section" onClick={() => setSections(sections.filter((_, j) => j !== i))}>✕</button>
+            </span>
           </div>
           <SectionBody sec={sec} update={(patch) => update(i, patch)} />
         </section>
