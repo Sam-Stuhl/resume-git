@@ -11,9 +11,11 @@ FROM python:3.13-slim
 
 # LaTeX packages the template needs: latexsym, fullpage, titlesec, marvosym,
 # enumitem, hyperref, fancyhdr, babel, tabularx, glyphtounicode — all covered by
-# texlive-latex-recommended + texlive-fonts-recommended.
+# texlive-latex-recommended + texlive-fonts-recommended, plus
+# texlive-latex-extra for titlesec/enumitem (not in -recommended).
 RUN apt-get update && apt-get install -y --no-install-recommends \
         texlive-latex-recommended \
+        texlive-latex-extra \
         texlive-fonts-recommended \
     && rm -rf /var/lib/apt/lists/*
 
@@ -29,13 +31,12 @@ COPY db/ ./db/
 COPY api/ ./api/
 COPY services.py ./
 COPY samples/ ./samples/
+COPY scripts/ ./scripts/
 COPY --from=frontend /app/frontend/dist ./frontend/dist
 
-# Build-time smoke test: prove the TeX package set can compile the template.
-RUN python -c "import json; from core.pdf import compile_pdf_bytes; \
-    d=json.load(open('samples/sample_resume.json')); \
-    pdf=compile_pdf_bytes(d); assert pdf[:4]==b'%PDF', 'compile failed'; \
-    print('PDF smoke test OK', len(pdf), 'bytes')"
+# Build-time smoke test: prove the TeX package set can compile the template
+# (prints the LaTeX log tail on failure so a missing package is diagnosable).
+RUN PYTHONPATH=/app python scripts/pdf_smoke_test.py
 
 EXPOSE 8080
 CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8080"]
