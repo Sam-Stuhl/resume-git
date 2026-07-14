@@ -19,7 +19,6 @@ const TABS: { id: View; label: string }[] = [
   { id: "compare", label: "Compare" },
   { id: "network", label: "Network" },
   { id: "pdf", label: "PDF" },
-  { id: "settings", label: "Settings" },
 ];
 
 const SKELETON: VersionDetail = {
@@ -39,9 +38,7 @@ function useTheme() {
     else root.setAttribute("data-theme", theme);
     localStorage.setItem("theme", theme);
   }, [theme]);
-  const cycle = () => setTheme((t) => (t === "dark" ? "light" : t === "light" ? "system" : "dark"));
-  const icon = theme === "dark" ? "☾" : theme === "light" ? "☀" : "◐";
-  return { icon, cycle, theme };
+  return { theme, setTheme };
 }
 
 export default function App() {
@@ -57,7 +54,7 @@ export default function App() {
     return s == null ? window.innerWidth > 820 : s === "1";
   });
   const [fatal, setFatal] = useState("");
-  const theme = useTheme();
+  const { theme, setTheme } = useTheme();
 
   useEffect(() => { localStorage.setItem("railOpen", railOpen ? "1" : "0"); }, [railOpen]);
 
@@ -123,8 +120,7 @@ export default function App() {
         <button className="accent branch-btn" onClick={() => setView("tailor")} disabled={empty}>
           <GitBranchIcon size={14} /> <span className="nb-text">New branch</span>
         </button>
-        <button className="icon-btn" title={`Theme: ${theme.theme}`} onClick={theme.cycle}>{theme.icon}</button>
-        <button className="icon-btn" title="Settings" onClick={() => setView("settings")}>
+        <button className={"icon-btn" + (view === "settings" ? " active-icon" : "")} title="Settings" onClick={() => setView("settings")}>
           <GearIcon size={16} />
         </button>
       </div>
@@ -142,7 +138,6 @@ export default function App() {
                   current={current}
                   onSelect={setSelected}
                   onOpen={setModalVersion}
-                  onCollapse={() => setRailOpen(false)}
                 />
                 {selected != null && selected !== current && (
                   <div className="row" style={{ margin: "10px 12px" }}>
@@ -188,7 +183,7 @@ export default function App() {
               )}
               {view === "settings" && me && (
                 <>
-                  <Settings me={me} onChange={async () => setMe(await api.me())} />
+                  <Settings me={me} theme={theme} setTheme={setTheme} onChange={async () => setMe(await api.me())} />
                   <ImportPanel onImported={() => refresh()} />
                 </>
               )}

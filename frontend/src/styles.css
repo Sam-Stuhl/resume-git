@@ -116,6 +116,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--panel-2); p
 .icon-btn { padding: 6px; color: var(--muted); }
 .icon-btn:hover { color: var(--text); }
 .icon-btn.ghost { border-color: transparent; background: transparent; }
+.icon-btn.active-icon { color: var(--accent); border-color: var(--accent); }
 
 /* ── Tabs ── */
 .tabs { display: flex; gap: 2px; padding: 0 12px; border-bottom: 1px solid var(--border); background: var(--panel); }

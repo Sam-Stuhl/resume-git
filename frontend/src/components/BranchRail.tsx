@@ -1,6 +1,5 @@
 import type { VersionMeta } from "../types";
 import { branchName, ref } from "../lib/git";
-import { ChevronIcon } from "./icons";
 
 interface Props {
   versions: VersionMeta[];
@@ -8,18 +7,14 @@ interface Props {
   current: number | null;
   onSelect: (v: number) => void;
   onOpen?: (v: number) => void;
-  onCollapse: () => void;
 }
 
-/** Clean, collapsible commit history. Double-click a row for the detail modal. */
-export function BranchRail({ versions, selected, current, onSelect, onOpen, onCollapse }: Props) {
+/** Clean commit history. Double-click a row for the detail modal. */
+export function BranchRail({ versions, selected, current, onSelect, onOpen }: Props) {
   return (
     <div className="rail">
       <div className="rail-header">
         <span className="rail-title">History</span>
-        <button className="icon-btn ghost" onClick={onCollapse} title="Collapse history">
-          <ChevronIcon size={14} className="chev-left" />
-        </button>
       </div>
       <div className="rail-list">
         {versions.map((v, i) => {

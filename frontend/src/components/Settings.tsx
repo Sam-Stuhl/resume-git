@@ -4,7 +4,20 @@ import type { Me } from "../types";
 
 const MODELS = ["claude-sonnet-5", "claude-opus-4-8", "claude-haiku-4-5-20251001"];
 
-export function Settings({ me, onChange }: { me: Me; onChange: () => void }) {
+const THEMES: { id: string; label: string }[] = [
+  { id: "system", label: "System" },
+  { id: "light", label: "Light" },
+  { id: "dark", label: "Dark" },
+];
+
+export function Settings({
+  me, theme, setTheme, onChange,
+}: {
+  me: Me;
+  theme: string;
+  setTheme: (t: string) => void;
+  onChange: () => void;
+}) {
   const [key, setKey] = useState("");
   const [model, setModel] = useState(me.default_model);
   const [enabled, setEnabled] = useState(me.ai_enabled);
@@ -25,6 +38,16 @@ export function Settings({ me, onChange }: { me: Me; onChange: () => void }) {
   return (
     <div className="card" style={{ maxWidth: 560 }}>
       <p className="section-title">Settings</p>
+      <div className="field">
+        <label>Theme</label>
+        <div className="ed-modebar">
+          {THEMES.map((t) => (
+            <button key={t.id} className={"seg" + (theme === t.id ? " on" : "")} onClick={() => setTheme(t.id)}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="field">
         <label>Claude API key (write-only — never displayed)</label>
         <div className="row">
