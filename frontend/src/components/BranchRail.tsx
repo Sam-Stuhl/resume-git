@@ -1,5 +1,6 @@
 import type { VersionMeta } from "../types";
-import { branchName, ref, shortDate } from "../lib/git";
+import { branchName, ref } from "../lib/git";
+import { ChevronIcon } from "./icons";
 
 interface Props {
   versions: VersionMeta[];
@@ -7,56 +8,49 @@ interface Props {
   current: number | null;
   onSelect: (v: number) => void;
   onOpen?: (v: number) => void;
+  onCollapse: () => void;
 }
 
-/**
- * Git-styled history: the `main` spine (base commits) with tailored branches
- * indented under the commit they forked from. HEAD marks the checked-out
- * version. Clicking a node views it; checkout happens elsewhere.
- */
-export function BranchRail({ versions, selected, current, onSelect, onOpen }: Props) {
-  // Newest first, same as the API returns.
+/** Clean, collapsible commit history. Double-click a row for the detail modal. */
+export function BranchRail({ versions, selected, current, onSelect, onOpen, onCollapse }: Props) {
   return (
-    <div>
-      <p className="rail-title">Branches &amp; commits</p>
-      {versions.map((v, i) => {
-        const isHead = v.version === current;
-        const last = i === versions.length - 1;
-        return (
-          <button
-            key={v.version}
-            className={
-              "rail-node" +
-              (v.version === selected ? " selected" : "") +
-              (v.is_base ? "" : " branch")
-            }
-            onClick={() => onSelect(v.version)}
-            onDoubleClick={() => onOpen?.(v.version)}
-            title={(v.is_base ? "commit on main" : `branch · ${branchName(v)}`) + " — double-click for details"}
-          >
-            <span className="rail-graph">
-              <span
-                className={
-                  "node-dot " + (isHead ? "head" : v.is_base ? "commit" : "branch")
-                }
-              />
-              {!last && <span className="rail-line" />}
-            </span>
-            <span className="rail-body">
-              <span className="rail-msg">{v.label || "(no message)"}</span>
-              <span className="rail-meta">
-                {v.is_base ? "main" : branchName(v)} · {ref(v.version)}
-                {v.forked_from ? ` · from ${ref(v.forked_from)}` : ""} · {shortDate(v.created_at)}
+    <div className="rail">
+      <div className="rail-header">
+        <span className="rail-title">History</span>
+        <button className="icon-btn ghost" onClick={onCollapse} title="Collapse history">
+          <ChevronIcon size={14} className="chev-left" />
+        </button>
+      </div>
+      <div className="rail-list">
+        {versions.map((v, i) => {
+          const isHead = v.version === current;
+          const last = i === versions.length - 1;
+          return (
+            <button
+              key={v.version}
+              className={"rnode" + (v.version === selected ? " sel" : "") + (v.is_base ? "" : " branch")}
+              onClick={() => onSelect(v.version)}
+              onDoubleClick={() => onOpen?.(v.version)}
+              title={(v.is_base ? "commit on main" : `branch · ${branchName(v)}`) + " — double-click for details"}
+            >
+              <span className="rgraph">
+                <span className={"rdot " + (isHead ? "head" : v.is_base ? "commit" : "branch")} />
+                {!last && <span className="rline" />}
               </span>
-            </span>
-            {isHead && (
-              <span className="rail-head">
-                <span className="badge head">HEAD</span>
+              <span className="rbody">
+                <span className="rmsg">
+                  <span className="rmsg-text">{v.label || "(no message)"}</span>
+                  {isHead && <span className="badge head">HEAD</span>}
+                </span>
+                <span className="rmeta">
+                  <span className="mono">{ref(v.version)}</span>{" · "}
+                  {v.is_base ? <span className="on-main">main</span> : <span className="on-branch">{branchName(v)}</span>}
+                </span>
               </span>
-            )}
-          </button>
-        );
-      })}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

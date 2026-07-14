@@ -2,13 +2,14 @@ import { useState } from "react";
 import { api, ApiError } from "../api";
 import type { Me, TailorPreview } from "../types";
 import { slugify } from "../lib/git";
+import { GitBranchIcon } from "./icons";
 import { DiffLines, Summary } from "./DiffView";
 
 /**
- * Tailor = branch off `main` for a specific job. Name the branch, paste the JD,
- * let Claude tailor (or copy-paste), review the diff, then create the branch.
+ * Create a branch: fork off `main` for a specific job. Name the branch, paste
+ * the JD, let Claude draft it (or copy-paste), review the diff, then commit.
  */
-export function TailorFlow({ me, onCreated }: { me: Me; onCreated: (v: number) => void }) {
+export function BranchFlow({ me, onCreated }: { me: Me; onCreated: (v: number) => void }) {
   const [name, setName] = useState("");
   const [jd, setJd] = useState("");
   const [busy, setBusy] = useState(false);
@@ -19,7 +20,7 @@ export function TailorFlow({ me, onCreated }: { me: Me; onCreated: (v: number) =
 
   const slug = slugify(name);
 
-  async function aiTailor() {
+  async function draft() {
     setErr("");
     setPreview(null);
     setBusy(true);
@@ -37,7 +38,7 @@ export function TailorFlow({ me, onCreated }: { me: Me; onCreated: (v: number) =
     setBusy(true);
     setErr("");
     try {
-      const res = await api.createTailor(data, name || "Tailored", jd || null);
+      const res = await api.createTailor(data, name || "Branch", jd || null);
       onCreated(res.version);
     } catch (e) {
       const d: any = (e as ApiError).detail;
@@ -70,9 +71,11 @@ export function TailorFlow({ me, onCreated }: { me: Me; onCreated: (v: number) =
   return (
     <div style={{ maxWidth: 720 }}>
       <div className="card">
-        <p className="section-title">⑃ New branch — tailor for a job</p>
+        <p className="section-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <GitBranchIcon size={14} /> New branch for a job
+        </p>
         <p className="muted" style={{ fontSize: 12, marginTop: -4, marginBottom: 12 }}>
-          Branches off <code>main</code>; your baseline stays untouched.
+          Forks off <code>main</code> and adapts it to the role; your baseline stays untouched.
         </p>
         <div className="field">
           <label>Branch name</label>
@@ -85,15 +88,15 @@ export function TailorFlow({ me, onCreated }: { me: Me; onCreated: (v: number) =
         </div>
         {me.ai_enabled ? (
           <div className="row">
-            <button className="accent" disabled={busy || !jd.trim()} onClick={aiTailor}>
-              {busy ? "Tailoring…" : "⑃ Tailor with Claude"}
+            <button className="accent" disabled={busy || !jd.trim()} onClick={draft}>
+              {busy ? "Drafting…" : "Draft with Claude"}
             </button>
             <span className="muted" style={{ fontSize: 12 }}>Model: {me.default_model}</span>
           </div>
         ) : (
           <div className="row">
             <button onClick={showPrompt}>Get session prompt (copy into Claude)</button>
-            <span className="muted" style={{ fontSize: 12 }}>No API key — copy-paste mode. Add a key in Settings to tailor in-app.</span>
+            <span className="muted" style={{ fontSize: 12 }}>No API key — copy-paste mode. Add a key in Settings to draft in-app.</span>
           </div>
         )}
         {err && <p className="err">{err}</p>}
@@ -109,7 +112,7 @@ export function TailorFlow({ me, onCreated }: { me: Me; onCreated: (v: number) =
           </details>
           <div className="row" style={{ marginTop: 12 }}>
             <button className="green" disabled={busy} onClick={() => createBranch(preview.data)}>
-              ⑃ Create branch {slug}
+              <GitBranchIcon size={13} /> Create branch {slug}
             </button>
             <button disabled={busy} onClick={() => setPreview(null)}>Discard</button>
           </div>
@@ -124,9 +127,11 @@ export function TailorFlow({ me, onCreated }: { me: Me; onCreated: (v: number) =
           <p className="muted" style={{ fontSize: 12 }}>
             Paste into a new Claude chat, send a <code>[TAILOR]</code> turn with the JD, then paste the returned JSON below.
           </p>
-          <textarea rows={7} value={pasted} onChange={(e) => setPasted(e.target.value)} placeholder="Paste the tailored JSON from Claude…" />
+          <textarea rows={7} value={pasted} onChange={(e) => setPasted(e.target.value)} placeholder="Paste the adapted JSON from Claude…" />
           <div className="row" style={{ marginTop: 8 }}>
-            <button className="green" disabled={busy || !pasted.trim()} onClick={commitPasted}>⑃ Create branch {slug}</button>
+            <button className="green" disabled={busy || !pasted.trim()} onClick={commitPasted}>
+              <GitBranchIcon size={13} /> Create branch {slug}
+            </button>
           </div>
         </div>
       )}

@@ -3,13 +3,14 @@ import { api, ApiError } from "./api";
 import type { Me, VersionDetail, VersionMeta } from "./types";
 import { BranchRail } from "./components/BranchRail";
 import { Workbench } from "./components/Workbench";
-import { TailorFlow } from "./components/TailorFlow";
+import { BranchFlow } from "./components/BranchFlow";
 import { PdfPreview } from "./components/PdfPreview";
 import { Compare } from "./components/Compare";
 import { NetworkGraph } from "./components/NetworkGraph";
 import { CommitModal } from "./components/CommitModal";
 import { Settings } from "./components/Settings";
 import { ImportPanel } from "./components/ImportPanel";
+import { GearIcon, GitBranchIcon, MenuIcon } from "./components/icons";
 import { branchName, ref } from "./lib/git";
 
 type View = "edit" | "compare" | "network" | "pdf" | "settings" | "tailor";
@@ -51,8 +52,14 @@ export default function App() {
   const [detail, setDetail] = useState<VersionDetail | null>(null);
   const [view, setView] = useState<View>("edit");
   const [modalVersion, setModalVersion] = useState<number | null>(null);
+  const [railOpen, setRailOpen] = useState<boolean>(() => {
+    const s = localStorage.getItem("railOpen");
+    return s == null ? window.innerWidth > 820 : s === "1";
+  });
   const [fatal, setFatal] = useState("");
   const theme = useTheme();
+
+  useEffect(() => { localStorage.setItem("railOpen", railOpen ? "1" : "0"); }, [railOpen]);
 
   const refresh = useCallback(async (selectVersion?: number) => {
     const vs = await api.versions();
@@ -97,7 +104,6 @@ export default function App() {
   if (fatal) return <div style={{ padding: 24 }} className="err">{fatal}</div>;
 
   const empty = versions.length === 0;
-  const owner = me?.email ? me.email.split("@")[0] : "you";
   const headMeta = versions.find((v) => v.version === current);
   const onMain = headMeta ? headMeta.is_base : true;
   const editDetail = detail ?? (empty ? SKELETON : null);
@@ -105,36 +111,48 @@ export default function App() {
   return (
     <div className="app">
       <div className="appbar">
-        <span className="repo">
-          <span className="ico">▤</span>
-          <span className="owner">{owner} /</span>
-          <span className="name">resume</span>
-        </span>
+        <button className="icon-btn" title="Toggle history" onClick={() => setRailOpen((o) => !o)}>
+          <MenuIcon size={16} />
+        </button>
+        <span className="wordmark"><GitBranchIcon size={16} className="wm-ico" /> resume-git</span>
         <span className={"branch-pill " + (onMain ? "main" : "branch")}>
-          ⎇ {headMeta ? branchName(headMeta) : "main"}
+          <GitBranchIcon size={12} /> {headMeta ? branchName(headMeta) : "main"}
         </span>
         {current != null && <span className="head-badge">HEAD {ref(current)}</span>}
         <span className="spacer" />
-        <button className="accent" onClick={() => setView("tailor")} disabled={empty}>⑃ Tailor</button>
+        <button className="accent branch-btn" onClick={() => setView("tailor")} disabled={empty}>
+          <GitBranchIcon size={14} /> <span className="nb-text">New branch</span>
+        </button>
         <button className="icon-btn" title={`Theme: ${theme.theme}`} onClick={theme.cycle}>{theme.icon}</button>
-        <span className="who">{me?.email} · {me?.ai_enabled ? "AI on" : "copy-paste"}</span>
+        <button className="icon-btn" title="Settings" onClick={() => setView("settings")}>
+          <GearIcon size={16} />
+        </button>
       </div>
 
       <div className="layout">
-        <aside className="sidebar">
-          {empty ? (
-            <p className="muted">No commits yet. Add your resume on the Edit tab, or import from the CLI.</p>
-          ) : (
-            <>
-              <BranchRail versions={versions} selected={selected} current={current} onSelect={setSelected} onOpen={setModalVersion} />
-              {selected != null && selected !== current && (
-                <div className="row" style={{ marginTop: 12 }}>
-                  <button className="green" onClick={checkout}>Checkout {ref(selected)}</button>
-                </div>
-              )}
-            </>
-          )}
-        </aside>
+        {railOpen && (
+          <aside className="sidebar">
+            {empty ? (
+              <p className="muted" style={{ padding: "6px 10px" }}>No commits yet. Add your resume on the Edit tab, or import from the CLI.</p>
+            ) : (
+              <>
+                <BranchRail
+                  versions={versions}
+                  selected={selected}
+                  current={current}
+                  onSelect={setSelected}
+                  onOpen={setModalVersion}
+                  onCollapse={() => setRailOpen(false)}
+                />
+                {selected != null && selected !== current && (
+                  <div className="row" style={{ margin: "10px 12px" }}>
+                    <button className="green" onClick={checkout}>Checkout {ref(selected)}</button>
+                  </div>
+                )}
+              </>
+            )}
+          </aside>
+        )}
 
         <main className="main">
           <nav className="tabs">
@@ -160,7 +178,7 @@ export default function App() {
             )
           ) : (
             <div className="content">
-              {view === "tailor" && me && <TailorFlow me={me} onCreated={onCommitted} />}
+              {view === "tailor" && me && <BranchFlow me={me} onCreated={onCommitted} />}
               {view === "pdf" && selected != null && <PdfPreview version={selected} />}
               {view === "compare" && !empty && selected != null && (
                 <Compare versions={versions} selected={selected} />
