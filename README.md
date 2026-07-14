@@ -51,8 +51,10 @@ Run the tests with `pytest` (the PDF test auto-skips if `pdflatex` is absent).
 ## Deploying on `console`
 
 1. Create a Neon Postgres project; note the connection string.
-2. Register the project in the console; set secrets `DATABASE_URL`,
-   `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD` (see `console.toml`).
+2. Register the project in the console; set the `DATABASE_URL` secret. (That's
+   the only required secret — Cloudflare Access handles auth at the edge and
+   injects the identity header. `CF_ACCESS_TEAM_DOMAIN`/`CF_ACCESS_AUD` are
+   optional secrets that enable an extra JWT-signature check.)
 3. In Cloudflare Access, gate `resume.samstuhl.com` with Google IdP and your
    email allowlist.
 4. Copy `deploy.yml` to `.github/workflows/deploy.yml`. Push to `main` — GitHub

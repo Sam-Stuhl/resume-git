@@ -2,10 +2,16 @@
 # Validated on every build before anything touches Docker.
 
 # Runtime secrets, by NAME only (values live in the console, never in git):
-#   DATABASE_URL             Neon Postgres connection string (required)
-#   CF_ACCESS_TEAM_DOMAIN    e.g. https://yourteam.cloudflareaccess.com (JWT verify)
-#   CF_ACCESS_AUD            Cloudflare Access application AUD tag (JWT verify)
-secrets = ["DATABASE_URL", "CF_ACCESS_TEAM_DOMAIN", "CF_ACCESS_AUD"]
+#   DATABASE_URL   Neon Postgres connection string (REQUIRED)
+#
+# Cloudflare Access already gates this app and injects the authenticated-email
+# header (the console sets up the Access application + allowlist), so the app
+# needs nothing for auth. The two CF_ACCESS_* vars below are OPTIONAL and only
+# enable an extra JWT-signature check; add them as secrets only if you want that
+# hardening:
+#   CF_ACCESS_TEAM_DOMAIN    e.g. https://yourteam.cloudflareaccess.com
+#   CF_ACCESS_AUD            the Access application's AUD tag
+secrets = ["DATABASE_URL"]
 
 [app]
 name = "resume-manager"
