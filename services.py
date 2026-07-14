@@ -34,7 +34,7 @@ async def create_base(
     session: AsyncSession, user_id: int, data: dict, label: str | None
 ) -> Version:
     """Save ``data`` as a new base version and make it current."""
-    schema.validate(data)
+    data = schema.validate(data)  # normalizes to the section model
     v = await repo.next_version(session, user_id)
     row = await repo.insert_version(
         session, user_id,
@@ -55,7 +55,7 @@ async def create_tailor(
     jd_text: str | None,
 ) -> Version:
     """Save ``data`` as a tailored fork of the latest base and make it current."""
-    schema.validate(data)
+    data = schema.validate(data)  # normalizes to the section model
     base = await repo.latest_base_version(session, user_id)
     if base is None:
         raise NoBaseError()

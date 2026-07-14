@@ -14,6 +14,7 @@ from api.deps import get_current_user
 from core import ai, prompts
 from core.diff import diff_lines, summarize_changes
 from core.pdf import CompileError, compile_pdf_bytes, compute_archive_name
+from core.sections import normalize
 from db import repo
 from db.models import User, Version
 from db.session import get_session
@@ -40,7 +41,10 @@ def _meta(v: Version) -> schemas.VersionMeta:
 
 
 def _detail(v: Version) -> schemas.VersionDetail:
-    return schemas.VersionDetail(**_meta(v).model_dump(), jd_text=v.jd_text, data=v.data)
+    # Serve the section model so the editor works uniformly on old + new versions.
+    return schemas.VersionDetail(
+        **_meta(v).model_dump(), jd_text=v.jd_text, data=normalize(v.data)
+    )
 
 
 async def _ai_state(session: AsyncSession, user_id: int) -> tuple[bool, str]:

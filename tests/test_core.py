@@ -31,14 +31,36 @@ def test_schema_accepts_sample():
 @pytest.mark.parametrize(
     "bad",
     [
-        {"summary": "x"},                       # no personal
-        {"personal": {"name": ""}},             # empty name
-        {"personal": {"name": "A"}, "bogus": 1},  # unknown top-level key
+        {"summary": "x"},                                              # no personal.name
+        {"personal": {"name": ""}},                                   # empty name
+        {"personal": {"name": "A"}, "sections": [{"type": "nope"}]},   # unknown section type
+        {"personal": {"name": "A"}, "sections": [{"type": "roles", "entries": [{"title": "x"}]}]},  # role missing org
     ],
 )
 def test_schema_rejects(bad):
     with pytest.raises(schema.SchemaError):
         schema.validate(bad)
+
+
+def test_normalize_legacy_to_sections():
+    from core.sections import normalize
+
+    norm = normalize(SAMPLE)
+    assert "personal" in norm and isinstance(norm["sections"], list)
+    types = [s["type"] for s in norm["sections"]]
+    # sample has summary, experience, projects, leadership, skills, education
+    assert types == ["text", "roles", "projects", "roles", "skills", "education"]
+    # idempotent: normalizing the section model returns it unchanged in shape
+    assert normalize(norm)["sections"] == norm["sections"]
+
+
+def test_bullets_section_compiles():
+    data = {"personal": {"name": "A"}, "sections": [
+        {"type": "bullets", "title": "Certifications", "items": ["AWS Certified", "CKA"]},
+    ]}
+    schema.validate(data)
+    tex = build_latex(data)
+    assert "Certifications" in tex and "AWS Certified" in tex
 
 
 def test_tex_escape_specials():
