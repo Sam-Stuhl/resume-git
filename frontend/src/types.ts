@@ -49,12 +49,22 @@ export interface Education {
   school?: string; location?: string; gpa?: string;
   start_date?: string; end_date?: string; coursework?: string;
 }
+export interface SkillGroup { category?: string; items?: string; }
+
+export type SectionType = "text" | "roles" | "projects" | "skills" | "education" | "bullets";
+
+// A single flexible interface (not a strict union) keeps the editor simple;
+// the backend validates the per-type shape.
+export interface Section {
+  type: SectionType;
+  title: string;
+  text?: string;
+  entries?: (Role | Project | Education)[];
+  groups?: SkillGroup[];
+  items?: string[];
+}
+
 export interface Resume {
   personal?: Personal;
-  summary?: string;
-  experience?: Role[];
-  projects?: Project[];
-  leadership?: Role[];
-  skills?: Record<string, string>;
-  education?: Education[];
+  sections?: Section[];
 }

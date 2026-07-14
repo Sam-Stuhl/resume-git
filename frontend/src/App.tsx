@@ -24,7 +24,7 @@ const SKELETON: VersionDetail = {
   json_hash: "", jd_text: null,
   data: {
     personal: { name: "", email: "", phone: "", github: "", linkedin: "" },
-    summary: "", experience: [], projects: [], leadership: [], skills: {}, education: [],
+    sections: [],
   },
 };
 
