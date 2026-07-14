@@ -9,6 +9,7 @@ class Me(BaseModel):
     email: str
     ai_enabled: bool
     default_model: str
+    credential_kind: str | None = None  # "api" | "oauth" | None (no credential set)
 
 
 class VersionMeta(BaseModel):
@@ -73,3 +74,18 @@ class ImportIn(BaseModel):
 
 class PreviewIn(BaseModel):
     data: dict
+
+
+# ── Resume Copilot chat ───────────────────────────────────────────────────────
+class ChatMessageOut(BaseModel):
+    id: int
+    role: str
+    content: str
+    proposal: dict | None = None
+    created_at: str
+
+
+class ChatSendIn(BaseModel):
+    message: str
+    model: str | None = None
+    current_data: dict | None = None  # the resume in the editor (viewed branch)

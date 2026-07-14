@@ -92,6 +92,55 @@ async def test_preview_pdf(client):
     assert r.status_code == 200 and r.content[:4] == b"%PDF"
 
 
+async def test_chat_streams_and_persists(client, monkeypatch):
+    # A base + a configured credential are the preconditions for chat.
+    await client.post("/api/base", json={"data": SAMPLE, "label": "base"})
+    await client.put("/api/settings/api-key", json={"api_key": "sk-ant-api03-test"})
+
+    proposal = {
+        "data": {"personal": {"name": "A"}, "sections": []},
+        "intent": "tailor", "summary": ["Tailored"], "diff": [], "section_changes": [],
+    }
+
+    async def fake_stream(**kwargs):
+        assert kwargs["credential"] == "sk-ant-api03-test"
+        yield ("delta", "Hello ")
+        yield ("delta", "world")
+        yield ("proposal", proposal)
+        yield ("done", None)
+
+    monkeypatch.setattr("core.agent.stream_chat", fake_stream)
+
+    r = await client.post("/api/chat/main", json={"message": "[TAILOR] SWE"})
+    assert r.status_code == 200
+    frames = [
+        json.loads(line[len("data: "):])
+        for line in r.text.splitlines()
+        if line.startswith("data: ")
+    ]
+    kinds = [f["type"] for f in frames]
+    assert kinds == ["delta", "delta", "proposal", "done"]
+    assert frames[2]["data"]["intent"] == "tailor"
+
+    # History: user turn + assistant turn (with the proposal attached).
+    hist = (await client.get("/api/chat/main")).json()
+    assert [m["role"] for m in hist] == ["user", "assistant"]
+    assert hist[0]["content"] == "[TAILOR] SWE"
+    assert hist[1]["content"] == "Hello world"
+    assert hist[1]["proposal"]["intent"] == "tailor"
+
+    # A different thread is isolated; clear removes a thread's messages.
+    assert (await client.get("/api/chat/other")).json() == []
+    await client.delete("/api/chat/main")
+    assert (await client.get("/api/chat/main")).json() == []
+
+
+async def test_chat_requires_credential(client):
+    await client.post("/api/base", json={"data": SAMPLE, "label": "base"})
+    r = await client.post("/api/chat/main", json={"message": "[ASK] hi"})
+    assert r.status_code == 400
+
+
 async def test_import_bundle(client):
     bundle = {
         "current_version": 2,

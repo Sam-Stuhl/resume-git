@@ -3,21 +3,23 @@
 from __future__ import annotations
 
 import asyncio
+import json
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import services
 from api import schemas
 from api.deps import get_current_user
-from core import ai, prompts
+from core import agent, ai, prompts
 from core.diff import diff_lines, summarize_changes
 from core.pdf import CompileError, compile_pdf_bytes, compute_archive_name
 from core.sections import normalize
 from db import repo
-from db.models import User, Version
-from db.session import get_session
+from db.models import Message, User, Version
+from db.session import SessionLocal, get_session
 
 router = APIRouter(prefix="/api")
 
@@ -47,11 +49,26 @@ def _detail(v: Version) -> schemas.VersionDetail:
     )
 
 
+def _credential_kind(key: str | None) -> str | None:
+    if not key:
+        return None
+    return "oauth" if agent.is_oauth_token(key) else "api"
+
+
 async def _ai_state(session: AsyncSession, user_id: int) -> tuple[bool, str]:
     key = await repo.get_config(session, user_id, KEY_API)
     model = await repo.get_config(session, user_id, KEY_MODEL) or ai.DEFAULT_MODEL
     enabled = (await repo.get_config(session, user_id, KEY_AI_ENABLED)) != "0"
     return (bool(key) and enabled, model)
+
+
+async def _me(session: AsyncSession, user: User) -> schemas.Me:
+    ai_enabled, model = await _ai_state(session, user.id)
+    key = await repo.get_config(session, user.id, KEY_API)
+    return schemas.Me(
+        email=user.email, ai_enabled=ai_enabled, default_model=model,
+        credential_kind=_credential_kind(key),
+    )
 
 
 # ── Identity / settings ──────────────────────────────────────────────────────
@@ -60,8 +77,7 @@ async def me(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    ai_enabled, model = await _ai_state(session, user.id)
-    return schemas.Me(email=user.email, ai_enabled=ai_enabled, default_model=model)
+    return await _me(session, user)
 
 
 @router.get("/settings", response_model=schemas.Me)
@@ -69,8 +85,7 @@ async def get_settings(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    ai_enabled, model = await _ai_state(session, user.id)
-    return schemas.Me(email=user.email, ai_enabled=ai_enabled, default_model=model)
+    return await _me(session, user)
 
 
 @router.put("/settings")
@@ -248,6 +263,93 @@ async def diff_versions(
     return schemas.DiffOut(
         summary=summarize_changes(va.data, vb.data),
         lines=diff_lines(va.data, vb.data),
+    )
+
+
+# ── Resume Copilot chat ───────────────────────────────────────────────────────
+def _chat_msg(m: Message) -> schemas.ChatMessageOut:
+    return schemas.ChatMessageOut(
+        id=m.id, role=m.role, content=m.content, proposal=m.proposal,
+        created_at=m.created_at.isoformat() if m.created_at else "",
+    )
+
+
+@router.get("/chat/{thread_key}", response_model=list[schemas.ChatMessageOut])
+async def chat_history(
+    thread_key: str,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    rows = await repo.list_messages(session, user.id, thread_key)
+    return [_chat_msg(m) for m in rows]
+
+
+@router.delete("/chat/{thread_key}")
+async def chat_clear(
+    thread_key: str,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    await repo.clear_thread(session, user.id, thread_key)
+    await session.commit()
+    return {"ok": True}
+
+
+@router.post("/chat/{thread_key}")
+async def chat_send(
+    thread_key: str,
+    body: schemas.ChatSendIn,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    key = await repo.get_config(session, user.id, KEY_API)
+    if not key:
+        raise HTTPException(400, "No Claude API key or token configured. Add one in Settings.")
+
+    base = await repo.latest_base_version(session, user.id)
+    baseline = (
+        (await repo.get_version(session, user.id, base)).data
+        if base is not None else {"personal": {}, "sections": []}
+    )
+    model = body.model or await repo.get_config(session, user.id, KEY_MODEL)
+
+    # Replay only prior *text* turns as history (proposals are UI-only, never
+    # replayed as tool calls — keeps the Messages API history simple and valid).
+    prior = await repo.list_messages(session, user.id, thread_key)
+    history = [{"role": m.role, "content": m.content} for m in prior if m.content]
+
+    # Persist the user's message before streaming (committed on the request session).
+    await repo.add_message(session, user.id, thread_key, "user", body.message)
+    await session.commit()
+
+    async def gen():
+        parts: list[str] = []
+        proposal = None
+        async for kind, payload in agent.stream_chat(
+            credential=key, model=model, baseline=baseline,
+            history=history, user_message=body.message, current_data=body.current_data,
+        ):
+            if kind == "delta":
+                parts.append(payload)
+            elif kind == "proposal":
+                proposal = payload
+            yield f"data: {json.dumps({'type': kind, 'data': payload})}\n\n"
+        # Persist the assistant turn in a fresh session (the request session may be
+        # closing as the stream ends).
+        async with SessionLocal() as s2:
+            await repo.add_message(
+                s2, user.id, thread_key, "assistant", "".join(parts), proposal=proposal,
+            )
+            await s2.commit()
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
     )
 
 
