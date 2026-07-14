@@ -203,7 +203,8 @@ iframe.pdf { width: 100%; height: 100%; min-height: 70vh; border: 1px solid var(
 textarea.raw { width: 100%; min-height: 60vh; }
 
 /* ── Workbench 3-pane + commit bar ── */
-.workbench { display: grid; grid-template-columns: 1fr 1fr; gap: 0; height: 100%; }
+.edit-fill, .wb-wrap { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.workbench { display: grid; grid-template-columns: 1fr 1fr; gap: 0; flex: 1; min-height: 0; }
 .wb-editor { overflow: auto; padding: 16px; border-right: 1px solid var(--border); }
 .wb-preview { overflow: hidden; padding: 16px; display: flex; flex-direction: column; }
 .commit-bar { display: flex; align-items: center; gap: 10px; padding: 8px 16px; border-top: 1px solid var(--border); background: var(--panel); }

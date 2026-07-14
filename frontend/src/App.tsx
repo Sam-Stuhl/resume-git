@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "./api";
 import type { Me, VersionDetail, VersionMeta } from "./types";
 import { BranchRail } from "./components/BranchRail";
-import { Editor } from "./components/Editor";
+import { Workbench } from "./components/Workbench";
 import { TailorPanel } from "./components/TailorPanel";
 import { PdfPreview } from "./components/PdfPreview";
 import { DiffPanel } from "./components/DiffPanel";
@@ -18,6 +18,15 @@ const TABS: { id: View; label: string }[] = [
   { id: "pdf", label: "PDF" },
   { id: "settings", label: "Settings" },
 ];
+
+const SKELETON: VersionDetail = {
+  version: 0, created_at: "", label: null, is_base: true, forked_from: null,
+  json_hash: "", jd_text: null,
+  data: {
+    personal: { name: "", email: "", phone: "", github: "", linkedin: "" },
+    summary: "", experience: [], projects: [], leadership: [], skills: {}, education: [],
+  },
+};
 
 function useTheme() {
   const [theme, setTheme] = useState<string>(() => localStorage.getItem("theme") || "system");
@@ -71,10 +80,9 @@ export default function App() {
     api.version(selected).then(setDetail).catch(() => setDetail(null));
   }, [selected]);
 
-  const onSaved = async (v: number) => {
+  const onCommitted = async (v: number) => {
     await refresh(v);
     setMe(await api.me());
-    setView("pdf");
   };
 
   const checkout = async () => {
@@ -89,6 +97,7 @@ export default function App() {
   const owner = me?.email ? me.email.split("@")[0] : "you";
   const headMeta = versions.find((v) => v.version === current);
   const onMain = headMeta ? headMeta.is_base : true;
+  const editDetail = detail ?? (empty ? SKELETON : null);
 
   return (
     <div className="app">
@@ -103,15 +112,9 @@ export default function App() {
         </span>
         {current != null && <span className="head-badge">HEAD {ref(current)}</span>}
         <span className="spacer" />
-        <button className="accent" onClick={() => setView("tailor")} disabled={empty}>
-          ⑃ Tailor
-        </button>
-        <button className="icon-btn" title={`Theme: ${theme.theme}`} onClick={theme.cycle}>
-          {theme.icon}
-        </button>
-        <span className="who">
-          {me?.email} · {me?.ai_enabled ? "AI on" : "copy-paste"}
-        </span>
+        <button className="accent" onClick={() => setView("tailor")} disabled={empty}>⑃ Tailor</button>
+        <button className="icon-btn" title={`Theme: ${theme.theme}`} onClick={theme.cycle}>{theme.icon}</button>
+        <span className="who">{me?.email} · {me?.ai_enabled ? "AI on" : "copy-paste"}</span>
       </div>
 
       <div className="layout">
@@ -133,68 +136,48 @@ export default function App() {
         <main className="main">
           <nav className="tabs">
             {TABS.map((t) => (
-              <button
-                key={t.id}
-                className={"tab" + (view === t.id ? " active" : "")}
-                onClick={() => setView(t.id)}
-              >
+              <button key={t.id} className={"tab" + (view === t.id ? " active" : "")} onClick={() => setView(t.id)}>
                 {t.label}
               </button>
             ))}
           </nav>
-          <div className="content">
-            {view === "edit" &&
-              (detail ? (
-                <Editor detail={detail} onSaved={onSaved} />
-              ) : (
-                <>
-                  {empty && <ImportPanel onImported={() => refresh()} />}
-                  <EmptyEditor onSaved={onSaved} />
-                </>
-              ))}
-            {view === "tailor" && me && <TailorPanel me={me} onSaved={onSaved} />}
-            {view === "pdf" && selected != null && <PdfPreview version={selected} />}
-            {view === "compare" && !empty && selected != null && (
-              <DiffPanel versions={versions} selected={selected} />
-            )}
-            {view === "network" && (
-              <div className="card">
-                <p className="section-title">Network</p>
-                <p className="muted">The branch graph lands in a later pass. For now, the rail on the left shows your commits and branches.</p>
+
+          {view === "edit" ? (
+            editDetail ? (
+              <div className="edit-fill">
+                {empty && (
+                  <div style={{ padding: 16, borderBottom: "1px solid var(--border)" }}>
+                    <ImportPanel onImported={() => refresh()} />
+                  </div>
+                )}
+                <Workbench detail={editDetail} onCommitted={onCommitted} />
               </div>
-            )}
-            {view === "settings" && me && (
-              <>
-                <Settings me={me} onChange={async () => setMe(await api.me())} />
-                <ImportPanel onImported={() => refresh()} />
-              </>
-            )}
-          </div>
+            ) : (
+              <div className="content"><p className="muted">Loading…</p></div>
+            )
+          ) : (
+            <div className="content">
+              {view === "tailor" && me && <TailorPanel me={me} onSaved={onCommitted} />}
+              {view === "pdf" && selected != null && <PdfPreview version={selected} />}
+              {view === "compare" && !empty && selected != null && (
+                <DiffPanel versions={versions} selected={selected} />
+              )}
+              {view === "network" && (
+                <div className="card">
+                  <p className="section-title">Network</p>
+                  <p className="muted">The branch graph lands in a later pass. For now, the rail on the left shows your commits and branches.</p>
+                </div>
+              )}
+              {view === "settings" && me && (
+                <>
+                  <Settings me={me} onChange={async () => setMe(await api.me())} />
+                  <ImportPanel onImported={() => refresh()} />
+                </>
+              )}
+            </div>
+          )}
         </main>
       </div>
     </div>
   );
-}
-
-// Blank base editor seeded with the schema shape, shown when there are no commits.
-function EmptyEditor({ onSaved }: { onSaved: (v: number) => void }) {
-  const skeleton: VersionDetail = {
-    version: 0,
-    created_at: "",
-    label: null,
-    is_base: true,
-    forked_from: null,
-    json_hash: "",
-    jd_text: null,
-    data: {
-      personal: { name: "", email: "", phone: "", github: "", linkedin: "" },
-      summary: "",
-      experience: [],
-      projects: [],
-      leadership: [],
-      skills: {},
-      education: [],
-    },
-  };
-  return <Editor detail={skeleton} onSaved={onSaved} />;
 }
