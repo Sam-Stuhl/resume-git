@@ -31,13 +31,15 @@ export function ResumeEditor({ value, onChange }: { value: Resume; onChange: (r:
   };
 
   return (
-    <div>
+    <div className="resume-editor">
       <div className="ed-modebar">
         <button className={"seg" + (mode === "form" ? " on" : "")} onClick={() => setMode("form")}>Form</button>
         <button className={"seg" + (mode === "raw" ? " on" : "")} onClick={enterRaw}>Raw JSON</button>
       </div>
       {mode === "form" ? (
-        <SectionEditor value={value} onChange={onChange} />
+        <div className="ed-scroll">
+          <SectionEditor value={value} onChange={onChange} />
+        </div>
       ) : (
         <div className="cm-wrap">
           <Suspense fallback={<p className="muted">Loading editor…</p>}>

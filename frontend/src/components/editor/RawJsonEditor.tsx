@@ -15,6 +15,7 @@ export default function RawJsonEditor({
   const isDark = useEffectiveTheme() === "dark";
   return (
     <CodeMirror
+      className="cm-fill"
       value={value}
       onChange={onChange}
       theme={isDark ? githubDark : githubLight}
@@ -27,7 +28,7 @@ export default function RawJsonEditor({
         closeBrackets: true,
         autocompletion: false,
       }}
-      height="62vh"
+      height="100%"
     />
   );
 }

@@ -236,6 +236,9 @@ iframe.pdf { width: 100%; height: 100%; min-height: 70vh; border: 1px solid var(
 .entry-card { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; background: var(--panel); }
 .entry-head { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; }
 textarea.raw { width: 100%; min-height: 60vh; }
+.cm-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.cm-fill { flex: 1; min-height: 0; }
+.cm-fill .cm-editor { height: 100%; }
 .cm-wrap .cm-editor { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; font-size: 12.5px; }
 .cm-wrap .cm-editor.cm-focused { outline: none; border-color: var(--accent); }
 .cm-wrap .cm-gutters { border-radius: 8px 0 0 8px; }
@@ -261,7 +264,9 @@ textarea.raw { width: 100%; min-height: 60vh; }
 /* ── Workbench 3-pane + commit bar ── */
 .edit-fill, .wb-wrap { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .workbench { display: grid; grid-template-columns: 1fr 1fr; gap: 0; flex: 1; min-height: 0; }
-.wb-editor { overflow: auto; padding: 16px; border-right: 1px solid var(--border); }
+.wb-editor { display: flex; flex-direction: column; overflow: hidden; padding: 16px; border-right: 1px solid var(--border); min-height: 0; }
+.resume-editor { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.ed-scroll { flex: 1; min-height: 0; overflow: auto; }
 .wb-preview { overflow: hidden; padding: 16px; display: flex; flex-direction: column; }
 .commit-bar { display: flex; align-items: center; gap: 10px; padding: 8px 16px; border-top: 1px solid var(--border); background: var(--panel); }
 .commit-bar .hint { color: var(--faint); font-size: 12px; }
@@ -270,9 +275,10 @@ textarea.raw { width: 100%; min-height: 60vh; }
 
 /* ── Responsive (kept last so it wins the cascade) ── */
 @media (max-width: 900px) {
+  /* Stack to one pane: the editor takes the full area; preview lives on the PDF tab. */
   .workbench { grid-template-columns: 1fr; }
-  .wb-editor { border-right: none; border-bottom: 1px solid var(--border); }
-  .wb-preview { min-height: 420px; }
+  .wb-editor { border-right: none; }
+  .wb-preview { display: none; }
 }
 @media (max-width: 820px) {
   .layout { position: relative; }
