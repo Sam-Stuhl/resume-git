@@ -18,12 +18,14 @@ Two credential kinds are supported, auto-detected from the token prefix:
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 
 from core import schema
+from core import tools as agent_tools
 from core.diff import diff_lines, section_changes, summarize_changes
 from core.prompts import build_chat_system
 from core.sections import normalize
+from core.skills import get_skill
 
 DEFAULT_MODEL = "claude-sonnet-5"
 
@@ -31,36 +33,7 @@ DEFAULT_MODEL = "claude-sonnet-5"
 CLAUDE_CODE_IDENTITY = "You are Claude Code, Anthropic's official CLI for Claude."
 OAUTH_BETA = "oauth-2025-04-20"
 
-PROPOSE_RESUME_TOOL = {
-    "name": "propose_resume",
-    "description": (
-        "Propose a concrete, complete updated resume for the user to review and "
-        "apply. Call this only when the user wants a real change (a job TAILOR or a "
-        "BASE UPDATE life change). Pass the ENTIRE updated resume document, not a "
-        "fragment. Do not call this for advice (ASK) or audit (ATS) turns."
-    ),
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "resume": {
-                "type": "object",
-                "description": (
-                    "The complete updated resume as a {personal, sections} document, "
-                    "in the same shape as the baseline."
-                ),
-            },
-            "intent": {
-                "type": "string",
-                "enum": ["tailor", "base_update"],
-                "description": (
-                    "tailor = adapt to a specific job (apply as a new branch); "
-                    "base_update = a real change to the baseline (stage into the editor)."
-                ),
-            },
-        },
-        "required": ["resume"],
-    },
-}
+MAX_STEPS = 8
 
 
 def is_oauth_token(credential: str) -> bool:
@@ -68,21 +41,32 @@ def is_oauth_token(credential: str) -> bool:
     return credential.strip().startswith("sk-ant-oat")
 
 
-def _build_system(baseline: dict, current_data: dict | None, oauth: bool) -> list[dict]:
-    """System blocks: (CC identity for OAuth) + resume prompt (+ current-view note)."""
-    text = build_chat_system(baseline)
-    if current_data is not None and normalize(current_data) != normalize(baseline):
-        text += (
-            "\n\nCURRENTLY VIEWED VERSION — this is the branch the user is working "
-            "on right now. Treat it as the working resume for edits and audits this "
-            "turn (the baseline above is the canonical life-facts reference):\n"
-            + json.dumps(current_data, indent=2, ensure_ascii=False)
-        )
-    blocks: list[dict] = []
-    if oauth:
-        blocks.append({"type": "text", "text": CLAUDE_CODE_IDENTITY})
-    blocks.append({"type": "text", "text": text})
-    return blocks
+def _tools_for(skill_name: str | None) -> list[dict]:
+    """Tool schemas offered to the model: the skill's allow-list, or everything
+    (all reads + structural writes + propose_resume) in free-chat advisor mode."""
+    skill = get_skill(skill_name)
+    if skill is None:  # advisor default: everything
+        return [agent_tools.ALL_TOOL_SCHEMAS_BY_NAME[n]
+                for n in [*agent_tools.READ_TOOL_NAMES, *agent_tools.WRITE_TOOL_NAMES, "propose_resume"]]
+    return [agent_tools.ALL_TOOL_SCHEMAS_BY_NAME[n] for n in skill.allowed_tools]
+
+
+def _summarize_action(name: str, args: dict) -> str:
+    if name == "checkout":
+        return f"Checkout v{int(args.get('version', 0)):04d}"
+    if name == "restore":
+        return f"Restore v{int(args.get('version', 0)):04d} as a new commit"
+    return name
+
+
+def _read_summary(name: str, args) -> str:
+    if name == "diff_versions":
+        return f"diff v{int(args.get('a', 0)):04d}…v{int(args.get('b', 0)):04d}"
+    if name == "get_version":
+        return f"read v{int(args.get('version', 0)):04d}"
+    if name == "get_current":
+        return "read HEAD"
+    return "list versions"
 
 
 def _proposal_from(tool_input: dict, current: dict) -> dict:
@@ -105,13 +89,21 @@ async def stream_chat(
     history: list[dict],
     user_message: str,
     current_data: dict | None = None,
+    skill: str | None = None,
+    read_dispatch: Callable[[str, dict], Awaitable[dict]],
 ) -> AsyncIterator[tuple[str, object]]:
-    """Stream one assistant turn.
+    """Stream one assistant turn as a bounded, git-aware tool loop.
 
-    Yields ``("delta", text)`` for streamed prose, at most one
-    ``("proposal", {...})`` when Claude calls ``propose_resume``, ``("error", msg)``
-    for recoverable failures, and a terminal ``("done", None)``. Never raises —
-    all failures are surfaced as an ``error`` event so the SSE stream stays intact.
+    Each step gives the model a chance to call read tools (executed
+    server-side via ``read_dispatch`` and fed back in) or a write tool
+    (``checkout``/``restore``/``propose_resume``, surfaced to the UI and the
+    turn ends). Yields ``("delta", text)`` for streamed prose,
+    ``("tool_step", {"name","summary"})`` per read tool call, at most one
+    ``("proposal", {...})`` when Claude calls ``propose_resume``,
+    ``("action", {"tool","args","summary"})`` for a structural write,
+    ``("error", msg)`` for recoverable failures, and a terminal
+    ``("done", None)``. Never raises — all failures are surfaced as an
+    ``error`` event so the SSE stream stays intact.
     """
     try:
         import anthropic
@@ -120,11 +112,17 @@ async def stream_chat(
         yield ("done", None)
         return
 
-    oauth = is_oauth_token(credential)
-    system = _build_system(baseline, current_data, oauth)
-    messages = list(history) + [{"role": "user", "content": user_message}]
-    current = current_data if current_data is not None else baseline
+    skill_obj = get_skill(skill)
+    system_text = build_chat_system(baseline, skill_obj.instructions if skill_obj else None)
+    if current_data is not None and normalize(current_data) != normalize(baseline):
+        system_text += (
+            "\n\nCURRENTLY VIEWED VERSION (treat as the working resume this turn):\n"
+            + json.dumps(current_data, indent=2, ensure_ascii=False)
+        )
 
+    oauth = is_oauth_token(credential)
+    system = ([{"type": "text", "text": CLAUDE_CODE_IDENTITY}] if oauth else []) + \
+             [{"type": "text", "text": system_text}]
     if oauth:
         client = anthropic.AsyncAnthropic(
             auth_token=credential.strip(),
@@ -133,32 +131,68 @@ async def stream_chat(
     else:
         client = anthropic.AsyncAnthropic(api_key=credential.strip())
 
-    try:
-        async with client.messages.stream(
-            model=model or DEFAULT_MODEL,
-            max_tokens=8000,
-            system=system,
-            messages=messages,
-            tools=[PROPOSE_RESUME_TOOL],
-        ) as stream:
-            async for event in stream:
-                if (
-                    event.type == "content_block_delta"
-                    and getattr(event.delta, "type", None) == "text_delta"
-                ):
-                    yield ("delta", event.delta.text)
-            final = await stream.get_final_message()
-    except Exception as exc:  # noqa: BLE001 — surface any SDK/network/auth error
-        yield ("error", f"Claude request failed: {exc}")
-        yield ("done", None)
-        return
+    tool_schemas = _tools_for(skill)
+    messages = list(history) + [{"role": "user", "content": user_message}]
+    current = current_data if current_data is not None else baseline
 
-    for block in final.content:
-        if getattr(block, "type", None) == "tool_use" and block.name == "propose_resume":
-            try:
-                yield ("proposal", _proposal_from(block.input, current))
-            except schema.SchemaError as exc:
-                yield ("error", f"Claude proposed an invalid resume: {exc}")
+    for _ in range(MAX_STEPS):
+        try:
+            async with client.messages.stream(
+                model=model or DEFAULT_MODEL,
+                max_tokens=8000,
+                system=system,
+                messages=messages,
+                tools=tool_schemas,
+            ) as stream:
+                async for event in stream:
+                    if (
+                        event.type == "content_block_delta"
+                        and getattr(event.delta, "type", None) == "text_delta"
+                    ):
+                        yield ("delta", event.delta.text)
+                final = await stream.get_final_message()
+        except Exception as exc:  # noqa: BLE001 — surface any SDK/network/auth error
+            yield ("error", f"Claude request failed: {exc}")
+            yield ("done", None)
+            return
+
+        tool_uses = [b for b in final.content if getattr(b, "type", None) == "tool_use"]
+        reads = [b for b in tool_uses if b.name in agent_tools.READ_TOOL_NAMES]
+        writes = [b for b in tool_uses
+                 if b.name in agent_tools.WRITE_TOOL_NAMES or b.name == "propose_resume"]
+
+        if reads and not writes:
+            tool_results = []
+            for b in reads:
+                try:
+                    result = await read_dispatch(b.name, dict(b.input))
+                except Exception as exc:  # noqa: BLE001
+                    result = {"error": str(exc)}
+                yield ("tool_step", {"name": b.name, "summary": _read_summary(b.name, b.input)})
+                tool_results.append({
+                    "type": "tool_result", "tool_use_id": b.id, "content": json.dumps(result),
+                })
+            messages.append({"role": "assistant", "content": [
+                {"type": "tool_use", "id": b.id, "name": b.name, "input": dict(b.input)}
+                for b in reads
+            ]})
+            messages.append({"role": "user", "content": tool_results})
+            continue
+
+        if writes:
+            for b in writes:
+                if b.name == "propose_resume":
+                    try:
+                        yield ("proposal", _proposal_from(dict(b.input), current))
+                    except schema.SchemaError as exc:
+                        yield ("error", f"Claude proposed an invalid resume: {exc}")
+                else:
+                    yield ("action", {
+                        "tool": b.name, "args": dict(b.input),
+                        "summary": _summarize_action(b.name, dict(b.input)),
+                    })
             break
+
+        break  # end_turn — no tool calls, plain prose answer
 
     yield ("done", None)
