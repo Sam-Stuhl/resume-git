@@ -56,14 +56,16 @@ export function NetworkGraph({
                 />
               </svg>
               <div className="glabel">
-                <span className="gmsg">{v.label || "(no message)"}</span>
+                <span className="gmsg">
+                  <span className="gmsg-text">{v.label || "(no message)"}</span>
+                  {isHead && <span className="badge head">HEAD</span>}
+                </span>
                 <span className="gsub">
                   <span className="mono">{ref(v.version)}</span>{" · "}
                   {v.is_base ? <span className="on-main">main</span> : <span className="on-branch">{branchName(v)}</span>}
                   {v.forked_from ? <span className="mono" style={{ opacity: 0.7 }}>{"  ⑃ from " + ref(v.forked_from)}</span> : null}
                 </span>
               </div>
-              {isHead && <span className="badge head grow-head">HEAD</span>}
             </div>
           );
         })}
