@@ -10,7 +10,7 @@ import { NetworkGraph } from "./components/NetworkGraph";
 import { CommitModal } from "./components/CommitModal";
 import { Settings } from "./components/Settings";
 import { ImportPanel } from "./components/ImportPanel";
-import { GearIcon, GitBranchIcon, MenuIcon } from "./components/icons";
+import { GitBranchIcon, MenuIcon } from "./components/icons";
 import { branchName, ref } from "./lib/git";
 
 type View = "edit" | "compare" | "network" | "pdf" | "settings" | "tailor";
@@ -151,7 +151,7 @@ export default function App() {
           <nav className="tabs">
             {TABS.map((t) => (
               <button key={t.id} className={"tab" + (view === t.id ? " active" : "")} onClick={() => setView(t.id)}>
-                {t.id === "settings" && <GearIcon size={14} />}{t.label}
+                {t.label}
               </button>
             ))}
           </nav>
