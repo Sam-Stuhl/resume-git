@@ -89,3 +89,9 @@ class ChatSendIn(BaseModel):
     message: str
     model: str | None = None
     current_data: dict | None = None  # the resume in the editor (viewed branch)
+    skill: str | None = None
+
+
+class SkillOut(BaseModel):
+    name: str
+    description: str

@@ -141,6 +141,32 @@ async def test_chat_requires_credential(client):
     assert r.status_code == 400
 
 
+async def test_skills_endpoint(client):
+    r = await client.get("/api/skills")
+    assert r.status_code == 200
+    names = {s["name"] for s in r.json()}
+    assert names == {"ask", "ats", "tailor", "base-update"}
+
+
+async def test_chat_read_tool_streams_tool_step(client, monkeypatch):
+    await client.post("/api/base", json={"data": SAMPLE, "label": "base"})
+    await client.put("/api/settings/api-key", json={"api_key": "sk-ant-api03-test"})
+
+    async def fake_stream(**kwargs):
+        # The route must pass a working read_dispatch + skill through.
+        assert "read_dispatch" in kwargs
+        res = await kwargs["read_dispatch"]("list_versions", {})
+        assert res["versions"][0]["version"] == 1
+        yield ("tool_step", {"name": "list_versions", "summary": "list versions"})
+        yield ("delta", "one version")
+        yield ("done", None)
+
+    monkeypatch.setattr("core.agent.stream_chat", fake_stream)
+    r = await client.post("/api/chat/main", json={"message": "how many?", "skill": "ask"})
+    frames = [json.loads(l[6:]) for l in r.text.splitlines() if l.startswith("data: ")]
+    assert [f["type"] for f in frames] == ["tool_step", "delta", "done"]
+
+
 async def test_import_bundle(client):
     bundle = {
         "current_version": 2,

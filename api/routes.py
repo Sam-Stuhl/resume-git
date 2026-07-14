@@ -14,6 +14,8 @@ import services
 from api import schemas
 from api.deps import get_current_user
 from core import agent, ai, prompts
+from core import skills as skills_registry
+from core import tools as agent_tools
 from core.diff import diff_lines, summarize_changes
 from core.pdf import CompileError, compile_pdf_bytes, compute_archive_name
 from core.sections import normalize
@@ -267,6 +269,11 @@ async def diff_versions(
 
 
 # ── Resume Copilot chat ───────────────────────────────────────────────────────
+@router.get("/skills", response_model=list[schemas.SkillOut])
+async def list_skills(user: User = Depends(get_current_user)):
+    return skills_registry.skill_list()
+
+
 def _chat_msg(m: Message) -> schemas.ChatMessageOut:
     return schemas.ChatMessageOut(
         id=m.id, role=m.role, content=m.content, proposal=m.proposal,
@@ -322,24 +329,29 @@ async def chat_send(
     await repo.add_message(session, user.id, thread_key, "user", body.message)
     await session.commit()
 
+    uid = user.id
+
     async def gen():
         parts: list[str] = []
         proposal = None
-        async for kind, payload in agent.stream_chat(
-            credential=key, model=model, baseline=baseline,
-            history=history, user_message=body.message, current_data=body.current_data,
-        ):
-            if kind == "delta":
-                parts.append(payload)
-            elif kind == "proposal":
-                proposal = payload
-            yield f"data: {json.dumps({'type': kind, 'data': payload})}\n\n"
-        # Persist the assistant turn in a fresh session (the request session may be
-        # closing as the stream ends).
+        actions: list[dict] = []
         async with SessionLocal() as s2:
-            await repo.add_message(
-                s2, user.id, thread_key, "assistant", "".join(parts), proposal=proposal,
-            )
+            async def read_dispatch(name: str, args: dict) -> dict:
+                return await agent_tools.dispatch_read(s2, uid, name, args)
+            async for kind, payload in agent.stream_chat(
+                credential=key, model=model, baseline=baseline, history=history,
+                user_message=body.message, current_data=body.current_data,
+                skill=body.skill, read_dispatch=read_dispatch,
+            ):
+                if kind == "delta":
+                    parts.append(payload)
+                elif kind == "proposal":
+                    proposal = payload
+                elif kind == "action":
+                    actions.append(payload)
+                yield f"data: {json.dumps({'type': kind, 'data': payload})}\n\n"
+            await repo.add_message(s2, uid, thread_key, "assistant", "".join(parts),
+                                   proposal=proposal or ({"actions": actions} if actions else None))
             await s2.commit()
 
     return StreamingResponse(
