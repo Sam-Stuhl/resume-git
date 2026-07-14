@@ -283,8 +283,8 @@ git commit -m "Add read tools + tool schemas for the agentic assistant"
 
 **Files:**
 - Create: `core/skills/__init__.py`, `core/skills/ask.md`, `core/skills/ats.md`, `core/skills/tailor.md`, `core/skills/base-update.md`
-- Modify: `core/prompts.py` (add `SHARED_PREAMBLE` accessor — see Step 3)
 - Test: `tests/test_skills.py`
+- (`core/prompts.py` is **not** modified in this task — the mode text stays in `SESSION_PROMPT_TEMPLATE`.)
 
 **Interfaces:**
 - Produces:
@@ -339,7 +339,14 @@ Expected: FAIL (`ModuleNotFoundError: core.skills`).
 
 - [ ] **Step 3: Create the four SKILL.md files**
 
-Each file is YAML frontmatter + an instructions body. Frontmatter is exact; the body is the corresponding mode block **moved verbatim** from `core/prompts.py:SESSION_PROMPT_TEMPLATE`.
+Each file is YAML frontmatter + a **short focus-directive** instructions body. **Do NOT copy the big
+mode blocks** — the full TAILOR/BASE-UPDATE/ASK/ATS guidance and the ATS knowledge already reach the model
+via `build_session_prompt(baseline)`, which `build_chat_system` includes as the base (Task 3). These bodies
+just *focus* the turn and set the tool contract. **Leave `core/prompts.py:SESSION_PROMPT_TEMPLATE` fully
+intact** — the copy-paste CLI (`resume.py`) and the chat base both use it; there is no duplication because
+the mode text lives in exactly one place (the template).
+
+Write these four files verbatim:
 
 `core/skills/ask.md`:
 ```markdown
@@ -348,9 +355,10 @@ name: ask
 description: Get honest advice on your resume — nothing is changed.
 allowed_tools: [list_versions, get_version, diff_versions, get_current]
 ---
-You are giving honest, specific resume advice. Do NOT call propose_resume — you are not
-committing a change, only advising. You may read history (list_versions/get_version/
-diff_versions/get_current) to ground your answer. Answer in concise prose.
+Advice mode. Follow the [ASK] guidance in your system prompt: give an honest, specific
+opinion. Read the version history (list_versions / get_version / diff_versions /
+get_current) when it helps ground your answer. Do NOT call propose_resume — you are
+advising, not changing anything.
 ```
 
 `core/skills/ats.md`:
@@ -360,12 +368,10 @@ name: ats
 description: Audit a version against a job description before you submit.
 allowed_tools: [list_versions, get_version, diff_versions, get_current]
 ---
-Run a structured ATS/AI-screener audit of the current (or named) version against the
-pasted job description. Respond in plain English: keywords hit, keywords missing,
-acronym alignment, weak bullets, a predicted score range, and the top 3 fixes. Do NOT
-call propose_resume — this is an audit, not a change. Read versions as needed.
-<MOVE HERE: the "ATS MODE" section body from core/prompts.py:SESSION_PROMPT_TEMPLATE
-(the block describing the [ATS] audit output), verbatim.>
+ATS audit mode. Follow the [ATS] guidance in your system prompt: audit the current (or a
+named) version against the pasted job description — keywords hit/missing, acronym
+alignment, weak bullets, a predicted score range, and the top fixes. Read versions as
+needed. Respond in plain English. Do NOT call propose_resume — this is an audit.
 ```
 
 `core/skills/tailor.md`:
@@ -375,12 +381,10 @@ name: tailor
 description: Adapt your resume to a job and open it as a branch.
 allowed_tools: [list_versions, get_version, diff_versions, get_current, propose_resume]
 ---
-<MOVE HERE: the "TAILOR MODE — strict, presentation only, ATS-optimized" block from
-core/prompts.py:SESSION_PROMPT_TEMPLATE starting at the line "When I send a [TAILOR]
-message with a job description…" through the end of its "Required tailoring moves"
-list, verbatim.>
-When you have the tailored resume, call propose_resume with intent="tailor" and the
-COMPLETE {personal, sections} document. Add one sentence explaining what you changed.
+Tailor mode. Follow the [TAILOR] guidance in your system prompt to adapt the resume to
+the pasted job description, truthfully. Read the baseline/history as needed. When the
+tailored resume is ready, call propose_resume with intent="tailor" and the COMPLETE
+{personal, sections} document, plus one sentence explaining what you changed.
 ```
 
 `core/skills/base-update.md`:
@@ -390,14 +394,11 @@ name: base-update
 description: Apply a real life change to your baseline resume.
 allowed_tools: [list_versions, get_version, diff_versions, get_current, propose_resume]
 ---
-<MOVE HERE: the "BASE UPDATE" block from core/prompts.py:SESSION_PROMPT_TEMPLATE
-starting at "When I send a [BASE UPDATE] message…", verbatim, including its removal
-guidance.>
+Base-update mode. Follow the [BASE UPDATE] guidance in your system prompt to incorporate
+a real life change (or removal) into the baseline. Read the baseline/history as needed.
 When ready, call propose_resume with intent="base_update" and the COMPLETE updated
-{personal, sections} document. Add one sentence explaining what you changed.
+{personal, sections} document, plus one sentence explaining what you changed.
 ```
-
-After moving, delete the now-duplicated mode blocks from `SESSION_PROMPT_TEMPLATE` **only if** they are no longer referenced (the copy-paste CLI still uses the full template — see Step 4). If the CLI path still needs them, leave `SESSION_PROMPT_TEMPLATE` intact and treat the SKILL.md bodies as the canonical copies for the chat path.
 
 - [ ] **Step 4: Write `core/skills/__init__.py`**
 
@@ -459,7 +460,7 @@ Expected: PASS (4 tests).
 - [ ] **Step 6: Commit**
 
 ```bash
-git add core/skills tests/test_skills.py core/prompts.py
+git add core/skills tests/test_skills.py
 git commit -m "Add skill registry (SKILL.md) for the four resume intents"
 ```
 
