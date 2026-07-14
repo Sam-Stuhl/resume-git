@@ -179,6 +179,23 @@ pre.diff { margin: 0; font-family: var(--mono); font-size: 12px; line-height: 1.
 .compare-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .compare-arrow { color: var(--muted); font-family: var(--mono); font-size: 16px; }
 
+/* ── Live git-graph (Network tab) ── */
+.git-graph-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); max-width: 760px; }
+.git-graph { width: max-content; min-width: 100%; }
+.grow { display: flex; align-items: stretch; cursor: pointer; border-left: 2px solid transparent; position: relative; transition: background .1s; }
+.grow + .grow { border-top: 1px solid color-mix(in srgb, var(--border) 45%, transparent); }
+.grow:hover { background: var(--panel-2); }
+.grow.sel { background: color-mix(in srgb, var(--accent) 12%, transparent); border-left-color: var(--accent); }
+.gcell { flex: none; display: block; }
+.glabel { display: flex; flex-direction: column; justify-content: center; min-width: 0; padding: 3px 14px 3px 4px; }
+.gmsg { font-size: 13px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 440px; }
+.gsub { font-size: 11px; color: var(--faint); font-family: var(--mono); margin-top: 1px; white-space: nowrap; }
+.on-branch { color: var(--branch); }
+.on-main { color: var(--commit); }
+.grow-head { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); }
+.gnode { transition: r .1s ease; }
+.grow:hover .gcell circle:last-of-type { r: 6.5; }
+
 iframe.pdf { width: 100%; height: 100%; min-height: 70vh; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; }
 
 /* ── Section editor ── */

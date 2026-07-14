@@ -1,13 +1,13 @@
 import type { VersionMeta } from "../types";
-import { branchName, ref } from "../lib/git";
+import { branchName, computeGraphRows, ref } from "../lib/git";
 
-const X0 = 60, XS = 104, LANE = 64, R = 7;
-
-const short = (s: string) => (s.length > 16 ? s.slice(0, 15) + "…" : s);
+const ROW_H = 40, LANE_W = 16, PAD = 14, DOT = 5.5;
+const CY = ROW_H / 2;
 
 /**
- * GitHub-style network: `main` runs left→right along the bottom; every tailored
- * branch sits on a single lane above it and arcs off its fork point.
+ * Live git-graph: one interactive row per commit (newest first). Each row draws
+ * its own slice of the topology, so the graph and labels can never drift out of
+ * alignment. Rows hover, select, and mark HEAD.
  */
 export function NetworkGraph({
   versions, current, selected, onSelect,
@@ -17,64 +17,55 @@ export function NetworkGraph({
   selected: number | null;
   onSelect: (v: number) => void;
 }) {
-  const asc = [...versions].sort((a, b) => a.version - b.version);
-  const idx = new Map<number, number>();
-  asc.forEach((v, i) => idx.set(v.version, i));
-
-  const height = LANE + 96;
-  const mainY = height - 48;
-  const branchY = mainY - LANE; // one lane, same height for all branches
-  const width = X0 + (asc.length - 1) * XS + 60;
-
-  const xOf = (v: number) => X0 + (idx.get(v) ?? 0) * XS;
-  const yOf = (v: VersionMeta) => (v.is_base ? mainY : branchY);
-
-  const baseXs = asc.filter((v) => v.is_base).map((v) => xOf(v.version));
-  const spineFrom = Math.min(...baseXs, X0);
-  const spineTo = Math.max(...baseXs, X0);
+  const graphRows = computeGraphRows(versions);
+  const laneCount = graphRows[0]?.laneCount ?? 1;
+  const cellW = PAD + laneCount * LANE_W + 6;
+  const xLane = (l: number) => PAD + l * LANE_W;
+  const stroke = (l: number) => (l === 0 ? "var(--commit)" : "var(--branch)");
 
   return (
-    <div className="card" style={{ overflowX: "auto" }}>
-      <p className="section-title">Network</p>
-      <svg width={width} height={height} style={{ display: "block", minWidth: "100%" }}>
-        <line x1={spineFrom} y1={mainY} x2={spineTo} y2={mainY} stroke="var(--commit)" strokeWidth={2.5} />
-        {asc.filter((v) => !v.is_base && v.forked_from).map((v) => {
-          const fx = xOf(v.forked_from!), nx = xOf(v.version);
-          return (
-            <path
-              key={"e" + v.version}
-              d={`M ${fx} ${mainY} C ${fx + XS * 0.45} ${mainY} ${nx - XS * 0.45} ${branchY} ${nx} ${branchY}`}
-              fill="none" stroke="var(--branch)" strokeWidth={2}
-            />
-          );
-        })}
-        {asc.map((v) => {
-          const x = xOf(v.version), y = yOf(v);
+    <div className="git-graph-wrap">
+      <div className="git-graph">
+        {graphRows.map((gr) => {
+          const v = gr.meta;
           const isHead = v.version === current;
           const isSel = v.version === selected;
+          const nx = xLane(gr.nodeLane);
           return (
-            <g key={v.version} onClick={() => onSelect(v.version)} style={{ cursor: "pointer" }}>
-              <title>{ref(v.version)} · {v.is_base ? "main" : branchName(v)}{v.label ? " · " + v.label : ""}</title>
-              {isSel && <circle cx={x} cy={y} r={R + 5} fill="none" stroke="var(--accent)" strokeWidth={1.5} />}
-              <circle
-                cx={x} cy={y} r={isHead ? R + 1 : R}
-                fill={isHead ? "var(--bg)" : v.is_base ? "var(--commit)" : "var(--branch)"}
-                stroke={isHead ? "var(--commit)" : "none"} strokeWidth={3}
-              />
-              <text x={x} y={mainY + 22} textAnchor="middle" fontSize={11} fill="var(--muted)" fontFamily="var(--mono)">
-                {ref(v.version)}
-              </text>
-              {!v.is_base && (
-                <text x={x} y={branchY - 15} textAnchor="middle" fontSize={10} fill="var(--branch)" fontFamily="var(--mono)">
-                  {short(branchName(v))}
-                </text>
-              )}
-            </g>
+            <div
+              key={v.version}
+              className={"grow" + (isSel ? " sel" : "") + (isHead ? " head" : "")}
+              onClick={() => onSelect(v.version)}
+              title={`${ref(v.version)} · ${v.is_base ? "main" : branchName(v)}${v.label ? " · " + v.label : ""}`}
+            >
+              <svg className="gcell" width={cellW} height={ROW_H} aria-hidden="true">
+                {gr.through.map((l) => <line key={"t" + l} x1={xLane(l)} y1={0} x2={xLane(l)} y2={ROW_H} stroke={stroke(l)} strokeWidth={2} />)}
+                {gr.upHalf.map((l) => <line key={"u" + l} x1={xLane(l)} y1={0} x2={xLane(l)} y2={CY} stroke={stroke(l)} strokeWidth={2} />)}
+                {gr.downHalf.map((l) => <line key={"d" + l} x1={xLane(l)} y1={CY} x2={xLane(l)} y2={ROW_H} stroke={stroke(l)} strokeWidth={2} />)}
+                {gr.curves.map((l) => (
+                  <path key={"c" + l} fill="none" stroke="var(--branch)" strokeWidth={2}
+                    d={`M ${xLane(l)} 0 C ${xLane(l)} ${CY}, ${xLane(0)} ${CY - 8}, ${xLane(0)} ${CY}`} />
+                ))}
+                <circle
+                  cx={nx} cy={CY} r={isHead ? DOT + 1 : DOT}
+                  fill={isHead ? "var(--bg)" : gr.nodeLane === 0 ? "var(--commit)" : "var(--branch)"}
+                  stroke={isHead ? "var(--commit)" : isSel ? "var(--accent)" : "none"}
+                  strokeWidth={isHead ? 3 : 2}
+                />
+              </svg>
+              <div className="glabel">
+                <span className="gmsg">{v.label || "(no message)"}</span>
+                <span className="gsub">
+                  <span className="mono">{ref(v.version)}</span>{" · "}
+                  {v.is_base ? <span className="on-main">main</span> : <span className="on-branch">{branchName(v)}</span>}
+                  {v.forked_from ? <span className="mono" style={{ opacity: 0.7 }}>{"  ⑃ from " + ref(v.forked_from)}</span> : null}
+                </span>
+              </div>
+              {isHead && <span className="badge head grow-head">HEAD</span>}
+            </div>
           );
         })}
-        <text x={spineFrom - 6} y={mainY + 4} textAnchor="end" fontSize={11} fill="var(--commit)" fontFamily="var(--mono)">main</text>
-      </svg>
-      <p className="muted" style={{ fontSize: 12 }}>Click a node to select it. Green = commits on main; purple = tailored branches; ringed = HEAD. Hover for details.</p>
+      </div>
     </div>
   );
 }
