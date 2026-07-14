@@ -6,6 +6,7 @@ import { Workbench } from "./components/Workbench";
 import { TailorFlow } from "./components/TailorFlow";
 import { PdfPreview } from "./components/PdfPreview";
 import { Compare } from "./components/Compare";
+import { NetworkGraph } from "./components/NetworkGraph";
 import { Settings } from "./components/Settings";
 import { ImportPanel } from "./components/ImportPanel";
 import { branchName, ref } from "./lib/git";
@@ -162,11 +163,8 @@ export default function App() {
               {view === "compare" && !empty && selected != null && (
                 <Compare versions={versions} selected={selected} />
               )}
-              {view === "network" && (
-                <div className="card">
-                  <p className="section-title">Network</p>
-                  <p className="muted">The branch graph lands in a later pass. For now, the rail on the left shows your commits and branches.</p>
-                </div>
+              {view === "network" && !empty && (
+                <NetworkGraph versions={versions} current={current} selected={selected} onSelect={setSelected} />
               )}
               {view === "settings" && me && (
                 <>
