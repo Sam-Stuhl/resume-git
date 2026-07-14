@@ -16,6 +16,7 @@ export function Workbench({ detail, onCommitted }: { detail: VersionDetail; onCo
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [pane, setPane] = useState<"editor" | "preview">("editor"); // narrow-screen toggle
 
   useEffect(() => {
     setWorking(detail.data as Resume);
@@ -47,7 +48,13 @@ export function Workbench({ detail, onCommitted }: { detail: VersionDetail; onCo
 
   return (
     <div className="wb-wrap">
-      <div className="workbench">
+      <div className="pane-toggle">
+        <div className="ed-modebar">
+          <button className={"seg" + (pane === "editor" ? " on" : "")} onClick={() => setPane("editor")}>Editor</button>
+          <button className={"seg" + (pane === "preview" ? " on" : "")} onClick={() => setPane("preview")}>Preview</button>
+        </div>
+      </div>
+      <div className={"workbench pane-" + pane}>
         <div className="wb-editor">
           <ResumeEditor value={working} onChange={setWorking} />
           {err && <p className="err">{err}</p>}
