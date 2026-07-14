@@ -1,6 +1,13 @@
 import type {
-  DiffOut, Me, TailorPreview, VersionDetail, VersionMeta,
+  ChatMessage, ChatProposal, DiffOut, Me, TailorPreview, VersionDetail, VersionMeta,
 } from "./types";
+
+export interface ChatStreamHandlers {
+  onDelta: (text: string) => void;
+  onProposal: (proposal: ChatProposal) => void;
+  onError: (message: string) => void;
+  onDone: () => void;
+}
 
 export class ApiError extends Error {
   status: number;
@@ -79,6 +86,55 @@ export const api = {
       throw new ApiError(res.status, detail);
     }
     return res.blob();
+  },
+
+  // ── Resume Assistant chat ──
+  chatHistory: (thread: string) =>
+    req<ChatMessage[]>(`/api/chat/${encodeURIComponent(thread)}`),
+  clearChat: (thread: string) =>
+    req(`/api/chat/${encodeURIComponent(thread)}`, { method: "DELETE" }),
+
+  // Stream one assistant turn over SSE, dispatching frames to handlers.
+  chatStream: async (
+    thread: string,
+    body: { message: string; model?: string; current_data?: unknown },
+    h: ChatStreamHandlers
+  ): Promise<void> => {
+    const res = await fetch(`/api/chat/${encodeURIComponent(thread)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(body),
+    });
+    if (!res.ok || !res.body) {
+      let detail: unknown;
+      try {
+        detail = (await res.json()).detail;
+      } catch {
+        detail = res.statusText;
+      }
+      throw new ApiError(res.status, detail);
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let idx: number;
+      while ((idx = buf.indexOf("\n\n")) >= 0) {
+        const frame = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        const line = frame.split("\n").find((l) => l.startsWith("data: "));
+        if (!line) continue;
+        const evt = JSON.parse(line.slice(6)) as { type: string; data: unknown };
+        if (evt.type === "delta") h.onDelta(evt.data as string);
+        else if (evt.type === "proposal") h.onProposal(evt.data as ChatProposal);
+        else if (evt.type === "error") h.onError(evt.data as string);
+        else if (evt.type === "done") h.onDone();
+      }
+    }
   },
 
   importBundle: (

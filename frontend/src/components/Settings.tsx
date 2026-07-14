@@ -26,7 +26,7 @@ export function Settings({
   async function saveKey() {
     await api.saveApiKey(key);
     setKey("");
-    setMsg("API key saved.");
+    setMsg("Credential saved.");
     onChange();
   }
   async function savePrefs() {
@@ -49,16 +49,23 @@ export function Settings({
         </div>
       </div>
       <div className="field">
-        <label>Claude API key (write-only — never displayed)</label>
+        <label>Claude credential — API key or Claude Code token (write-only)</label>
         <div className="row">
           <input
             type="password"
             value={key}
             onChange={(e) => setKey(e.target.value)}
-            placeholder={me.ai_enabled ? "•••• (a key is set)" : "sk-ant-…"}
+            placeholder={me.credential_kind ? "•••• (a credential is set)" : "sk-ant-api… or sk-ant-oat…"}
             style={{ flex: 1 }}
           />
-          <button className="primary" disabled={!key.trim()} onClick={saveKey}>Save key</button>
+          <button className="primary" disabled={!key.trim()} onClick={saveKey}>Save</button>
+        </div>
+        <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
+          {me.credential_kind === "oauth"
+            ? "Using a Claude Code OAuth token (bills your Claude subscription)."
+            : me.credential_kind === "api"
+            ? "Using an API key (bills API credits)."
+            : "An sk-ant-api… key bills API credits; an sk-ant-oat… token (from `claude setup-token`) bills your Claude subscription."}
         </div>
       </div>
       <div className="field">

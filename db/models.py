@@ -64,3 +64,28 @@ class Config(Base):
     )
     key: Mapped[str] = mapped_column(String(100), primary_key=True)
     value: Mapped[str] = mapped_column(Text)
+
+
+class Message(Base):
+    """One turn in a Resume Copilot conversation.
+
+    Conversations are grouped by ``thread_key`` — ``"main"`` for the base line,
+    otherwise a branch slug (see ``lib/git.ts:branchName``). Assistant turns that
+    proposed a resume change carry the full proposal blob in ``proposal``
+    (``{data, intent, section_changes, diff, summary}``); it is replayed to the UI
+    but NOT back to the model (only ``content`` text is replayed as history).
+    """
+
+    __tablename__ = "messages"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    thread_key: Mapped[str] = mapped_column(String(200), index=True)
+    role: Mapped[str] = mapped_column(String(16))  # "user" | "assistant"
+    content: Mapped[str] = mapped_column(Text, default="")
+    proposal: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )

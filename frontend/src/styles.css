@@ -105,8 +105,8 @@ code { font-family: var(--mono); font-size: .92em; background: var(--panel-2); p
   max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .branch-pill svg { flex: none; }
-.branch-pill.main { color: var(--commit); }
-.branch-pill.branch { color: var(--branch); }
+.branch-pill.on-main { color: var(--commit); }
+.branch-pill.on-branch { color: var(--branch); }
 .head-badge {
   font-size: 10px; font-weight: 700; color: var(--commit); white-space: nowrap; flex: none;
   border: 1px solid color-mix(in srgb, var(--commit) 50%, transparent);
@@ -265,7 +265,11 @@ textarea.raw { width: 100%; min-height: 60vh; }
 /* ── Workbench 3-pane + commit bar ── */
 .edit-fill, .wb-wrap { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .workbench { display: grid; grid-template-columns: 1fr 1fr; gap: 0; flex: 1; min-height: 0; }
-.wb-editor { display: flex; flex-direction: column; overflow: hidden; padding: 16px; border-right: 1px solid var(--border); min-height: 0; }
+.wb-editor { display: flex; flex-direction: column; overflow: hidden; padding: 16px; min-height: 0; }
+/* Draggable divider between panes (a 6px grid track). */
+.wb-resizer { position: relative; cursor: col-resize; touch-action: none; }
+.wb-resizer::after { content: ""; position: absolute; inset: 0 2px; background: var(--border); transition: background .12s; }
+.wb-resizer:hover::after, .wb-resizer:active::after { background: var(--accent); }
 .resume-editor { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .ed-scroll { flex: 1; min-height: 0; overflow: auto; }
 .wb-preview { overflow: hidden; padding: 16px; display: flex; flex-direction: column; }
@@ -274,15 +278,62 @@ textarea.raw { width: 100%; min-height: 60vh; }
 .commit-bar input { flex: 1; max-width: 340px; }
 .dirty-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--active); flex: none; }
 
+/* ── Workbench toolbar + Assistant toggle ── */
+.wb-toolbar { display: flex; align-items: center; padding: 8px 16px 0; }
+.wb-chat-toggle { font-size: 12px; padding: 4px 12px; }
+.wb-chat-toggle.on { background: var(--panel-2); color: var(--text); border-color: var(--accent); }
+/* On wide screens the chat is a third column, shown only when toggled open. */
+.wb-chat { display: none; min-height: 0; overflow: hidden; }
+.workbench.chat-open { grid-template-columns: 1fr 6px 1fr 6px 380px; }
+.workbench.chat-open .wb-chat { display: flex; }
+
+/* ── Resume Assistant chat ── */
+.chatpanel { display: flex; flex-direction: column; flex: 1; min-height: 0; width: 100%; }
+.chat-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.chat-title { font-weight: 600; font-size: 13px; }
+.chat-thread { font-family: var(--mono); font-size: 11px; color: var(--muted); background: var(--panel-2); padding: 1px 6px; border-radius: 10px; }
+.chat-clear { font-size: 11px; padding: 2px 8px; }
+.chat-empty { padding: 16px; display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+.chat-msgs { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+.chat-hint { font-size: 12px; }
+.chat-msg { display: flex; flex-direction: column; gap: 8px; max-width: 100%; }
+.chat-msg.user { align-items: flex-end; }
+.chat-bubble { padding: 8px 11px; border-radius: 10px; font-size: 13px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; max-width: 90%; }
+.chat-msg.user .chat-bubble { background: color-mix(in srgb, var(--accent) 18%, var(--panel)); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+.chat-msg.assistant .chat-bubble { background: var(--panel); border: 1px solid var(--border); }
+.chat-err { margin: 0 12px; font-size: 12px; }
+.chat-input { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); align-items: flex-end; }
+.chat-input textarea { flex: 1; resize: none; font-size: 13px; }
+
+/* Proposal card inside an assistant bubble */
+.chat-proposal { border: 1px solid var(--border-strong); border-radius: var(--radius); padding: 12px; background: var(--panel); width: 100%; }
+.chat-proposal .section-title { margin-top: 0; }
+.sec-accept-list { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+.sec-accept { border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 8px; }
+.sec-accept > label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; }
+.sec-accept details { margin-top: 6px; }
+.sec-accept summary, .full-diff summary { font-size: 11px; cursor: pointer; }
+.sec-name { font-weight: 500; }
+.sec-tag { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; padding: 1px 6px; border-radius: 10px; font-weight: 700; }
+.sec-tag.added { color: var(--add); background: color-mix(in srgb, var(--add) 15%, transparent); }
+.sec-tag.removed { color: var(--del); background: color-mix(in srgb, var(--del) 15%, transparent); }
+.sec-tag.modified { color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); }
+.full-diff { margin-top: 6px; }
+.proposal-actions { margin-top: 10px; }
+
 /* ── Responsive (kept last so it wins the cascade) ── */
 @media (max-width: 900px) {
-  /* One pane at a time, switched by the Editor/Preview toggle. */
-  .pane-toggle { display: block; padding: 12px 16px 0; }
+  /* One pane at a time, switched by the Editor/Preview/Assistant toggle. */
+  .pane-toggle { display: block; }
+  .wb-toolbar { padding: 12px 16px 0; }
   .pane-toggle .ed-modebar { margin-bottom: 0; }
-  .workbench { grid-template-columns: 1fr; }
-  .wb-editor { border-right: none; }
-  .workbench.pane-editor .wb-preview { display: none; }
-  .workbench.pane-preview .wb-editor { display: none; }
+  .wb-chat-toggle { display: none; } /* the segmented Assistant tab replaces it */
+  .workbench, .workbench.chat-open { grid-template-columns: 1fr; }
+  .wb-resizer { display: none; } /* no dragging when panes stack */
+  .workbench.pane-editor .wb-preview, .workbench.pane-editor .wb-chat { display: none; }
+  .workbench.pane-preview .wb-editor, .workbench.pane-preview .wb-chat { display: none; }
+  .workbench.pane-chat .wb-editor, .workbench.pane-chat .wb-preview { display: none; }
+  .workbench.pane-chat .wb-chat { display: flex; }
 }
 @media (max-width: 820px) {
   .layout { position: relative; }

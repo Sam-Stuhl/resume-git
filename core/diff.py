@@ -44,17 +44,11 @@ def summarize_changes(old: dict, new: dict) -> list[str]:
     return changes
 
 
-def diff_lines(old: dict, new: dict, context: int = 2) -> list[dict]:
-    """Structured unified diff of the two normalized documents.
-
-    Returns ``{"tag": ..., "text": ...}`` where tag is ``meta``/``hunk``/
-    ``add``/``del``/``ctx``. The frontend maps tags to colors.
-    """
-    old_text = json.dumps(normalize(old), indent=2, ensure_ascii=False).splitlines()
-    new_text = json.dumps(normalize(new), indent=2, ensure_ascii=False).splitlines()
+def _unified(old_lines: list[str], new_lines: list[str], context: int = 2) -> list[dict]:
+    """Tag the lines of a unified diff for the frontend's color mapping."""
     out: list[dict] = []
     for line in difflib.unified_diff(
-        old_text, new_text, fromfile="previous", tofile="updated",
+        old_lines, new_lines, fromfile="previous", tofile="updated",
         n=context, lineterm="",
     ):
         if line.startswith("+++") or line.startswith("---"):
@@ -69,3 +63,76 @@ def diff_lines(old: dict, new: dict, context: int = 2) -> list[dict]:
             tag = "ctx"
         out.append({"tag": tag, "text": line})
     return out
+
+
+def diff_lines(old: dict, new: dict, context: int = 2) -> list[dict]:
+    """Structured unified diff of the two normalized documents.
+
+    Returns ``{"tag": ..., "text": ...}`` where tag is ``meta``/``hunk``/
+    ``add``/``del``/``ctx``. The frontend maps tags to colors.
+    """
+    old_text = json.dumps(normalize(old), indent=2, ensure_ascii=False).splitlines()
+    new_text = json.dumps(normalize(new), indent=2, ensure_ascii=False).splitlines()
+    return _unified(old_text, new_text, context)
+
+
+def _section_key(sec: dict) -> str:
+    return f"{sec.get('type', '')}::{sec.get('title', '')}"
+
+
+def _pretty(value) -> list[str]:
+    if value is None:
+        return []
+    return json.dumps(value, indent=2, ensure_ascii=False).splitlines()
+
+
+def section_changes(current: dict, proposed: dict) -> list[dict]:
+    """Section-level diff powering granular accept/reject in the proposal UI.
+
+    Compares two ``{personal, sections}`` docs (normalized first). ``personal`` is
+    treated as one pseudo-section (``key="personal"``); real sections match by
+    ``(type, title)``. Returns one entry per *changed* unit — unchanged units are
+    omitted — each ``{key, title, status, before, after, diff}`` where ``status``
+    is ``added``/``removed``/``modified`` and ``diff`` is the tagged line diff for
+    just that unit. The frontend merges accepted entries back onto the working copy.
+    """
+    cur, prop = normalize(current), normalize(proposed)
+    changes: list[dict] = []
+
+    if cur["personal"] != prop["personal"]:
+        changes.append({
+            "key": "personal",
+            "title": "Contact / Personal",
+            "status": "modified",
+            "before": cur["personal"],
+            "after": prop["personal"],
+            "diff": _unified(_pretty(cur["personal"]), _pretty(prop["personal"])),
+        })
+
+    cur_secs = {_section_key(s): s for s in cur["sections"]}
+    prop_secs = {_section_key(s): s for s in prop["sections"]}
+
+    # Walk proposed order first (added/modified), then current-only (removed).
+    for key, sec in prop_secs.items():
+        title = sec.get("title", "") or "(untitled)"
+        if key not in cur_secs:
+            changes.append({
+                "key": key, "title": title, "status": "added",
+                "before": None, "after": sec,
+                "diff": _unified([], _pretty(sec)),
+            })
+        elif cur_secs[key] != sec:
+            changes.append({
+                "key": key, "title": title, "status": "modified",
+                "before": cur_secs[key], "after": sec,
+                "diff": _unified(_pretty(cur_secs[key]), _pretty(sec)),
+            })
+    for key, sec in cur_secs.items():
+        if key not in prop_secs:
+            changes.append({
+                "key": key, "title": sec.get("title", "") or "(untitled)",
+                "status": "removed", "before": sec, "after": None,
+                "diff": _unified(_pretty(sec), []),
+            })
+
+    return changes

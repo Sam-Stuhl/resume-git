@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from core import schema
-from core.diff import diff_lines, summarize_changes
+from core.diff import diff_lines, section_changes, summarize_changes
 from core.latex import build_latex, tex_escape
 from core.pdf import compile_pdf_bytes, compute_archive_name, compute_pdf_name, pdflatex_available
 from core.util import hash_json
@@ -100,6 +100,36 @@ def test_summarize_and_diff():
     assert any("Summary" in c for c in changes)
     tags = {line["tag"] for line in diff_lines(SAMPLE, new)}
     assert "add" in tags and "del" in tags
+
+
+def test_section_changes_add_remove_modify_personal():
+    current = {
+        "personal": {"name": "Jordan Sample", "email": "j@x.com"},
+        "sections": [
+            {"type": "text", "title": "Summary", "text": "Old summary."},
+            {"type": "bullets", "title": "Awards", "items": ["Dean's List"]},
+        ],
+    }
+    proposed = {
+        "personal": {"name": "Jordan Sample", "email": "new@x.com"},  # modified
+        "sections": [
+            {"type": "text", "title": "Summary", "text": "New summary."},  # modified
+            {"type": "skills", "title": "Skills",                          # added
+             "groups": [{"category": "Lang", "items": "Python"}]},
+            # "Awards" dropped -> removed
+        ],
+    }
+    changes = {(c["key"], c["status"]) for c in section_changes(current, proposed)}
+    assert ("personal", "modified") in changes
+    assert ("text::Summary", "modified") in changes
+    assert ("skills::Skills", "added") in changes
+    assert ("bullets::Awards", "removed") in changes
+    # Each change carries a non-empty tagged diff.
+    for c in section_changes(current, proposed):
+        assert isinstance(c["diff"], list) and c["diff"]
+
+    # No changes -> empty list.
+    assert section_changes(current, current) == []
 
 
 def test_pdf_name():

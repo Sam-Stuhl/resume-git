@@ -6,10 +6,10 @@ No global state, no files: version JSON lives in ``Version.data``.
 
 from __future__ import annotations
 
-from sqlalchemy import select, func
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.models import Config, User, Version
+from db.models import Config, Message, User, Version
 
 CURRENT_KEY = "current_version"
 
@@ -126,3 +126,48 @@ async def insert_version(
     session.add(row)
     await session.flush()
     return row
+
+
+# ── Chat messages (Resume Copilot) ────────────────────────────────────────────
+async def add_message(
+    session: AsyncSession,
+    user_id: int,
+    thread_key: str,
+    role: str,
+    content: str,
+    proposal: dict | None = None,
+) -> Message:
+    row = Message(
+        user_id=user_id,
+        thread_key=thread_key,
+        role=role,
+        content=content,
+        proposal=proposal,
+    )
+    session.add(row)
+    await session.flush()
+    return row
+
+
+async def list_messages(
+    session: AsyncSession, user_id: int, thread_key: str
+) -> list[Message]:
+    rows = (
+        await session.execute(
+            select(Message)
+            .where(Message.user_id == user_id, Message.thread_key == thread_key)
+            .order_by(Message.id.asc())
+        )
+    ).scalars().all()
+    return list(rows)
+
+
+async def clear_thread(
+    session: AsyncSession, user_id: int, thread_key: str
+) -> None:
+    await session.execute(
+        delete(Message).where(
+            Message.user_id == user_id, Message.thread_key == thread_key
+        )
+    )
+    await session.flush()
