@@ -1,12 +1,13 @@
-# Deploy resume-manager through the console.
+# Deploy resume-git through the console.
 #
-# Thin caller — the build+notify logic lives once in sam-stuhl/console,
-# .github/workflows/app-deploy.yml. Pin @main to a commit sha for stability.
+# This is a thin caller. The build+notify logic lives once in
+# sam-stuhl/console (public), .github/workflows/app-deploy.yml; update it
+# there and every app picks it up. Pin @main to a commit sha if you want
+# stability over always-latest.
 #
-# One-time setup: in Cloudflare Access, add a Bypass policy for /hooks/* on the
-# console hostname (those endpoints authenticate via GitHub OIDC).
-#
-# This file must live at .github/workflows/deploy.yml in the repo.
+# One-time setup: in Cloudflare Access, add a Bypass policy for the
+# /hooks/* path on the console hostname. Those endpoints authenticate
+# themselves with the GitHub OIDC token, so Access must let them through.
 
 name: deploy
 
