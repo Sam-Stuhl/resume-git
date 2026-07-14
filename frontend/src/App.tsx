@@ -164,7 +164,7 @@ export default function App() {
                     <ImportPanel onImported={() => refresh()} />
                   </div>
                 )}
-                <Workbench detail={editDetail} onCommitted={onCommitted} />
+                <Workbench detail={editDetail} me={me} onCommitted={onCommitted} onOpenSettings={() => setView("settings")} />
               </div>
             ) : (
               <div className="content"><p className="muted">Loading…</p></div>

@@ -2,6 +2,7 @@ export interface Me {
   email: string;
   ai_enabled: boolean;
   default_model: string;
+  credential_kind?: "api" | "oauth" | null;
 }
 
 export interface VersionMeta {
@@ -67,4 +68,30 @@ export interface Section {
 export interface Resume {
   personal?: Personal;
   sections?: Section[];
+}
+
+// ── Resume Copilot chat ──
+export interface SectionChange {
+  key: string;
+  title: string;
+  status: "added" | "removed" | "modified";
+  before: unknown;
+  after: unknown;
+  diff: DiffLine[];
+}
+
+export interface ChatProposal {
+  data: Resume;
+  intent: "tailor" | "base_update" | null;
+  summary: string[];
+  diff: DiffLine[];
+  section_changes: SectionChange[];
+}
+
+export interface ChatMessage {
+  id: number;
+  role: "user" | "assistant";
+  content: string;
+  proposal: ChatProposal | null;
+  created_at: string;
 }
