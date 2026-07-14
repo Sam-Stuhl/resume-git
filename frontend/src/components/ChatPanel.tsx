@@ -65,6 +65,8 @@ export function ChatPanel({
         {
           onDelta: (d) => { text_ += d; setLiveText(text_); },
           onProposal: (p) => { proposal = p; setLiveProposal(p); },
+          onToolStep: () => {},
+          onAction: () => {},
           onError: (msg) => setErr(msg),
           onDone: () => { /* finalized below */ },
         }

@@ -95,3 +95,7 @@ export interface ChatMessage {
   proposal: ChatProposal | null;
   created_at: string;
 }
+
+export interface Skill { name: string; description: string; }
+export interface ToolStep { name: string; summary: string; }
+export interface AgentAction { tool: "checkout" | "restore"; args: Record<string, number>; summary: string; }

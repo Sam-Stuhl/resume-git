@@ -1,10 +1,13 @@
 import type {
-  ChatMessage, ChatProposal, DiffOut, Me, TailorPreview, VersionDetail, VersionMeta,
+  AgentAction, ChatMessage, ChatProposal, DiffOut, Me, Skill, TailorPreview, ToolStep,
+  VersionDetail, VersionMeta,
 } from "./types";
 
 export interface ChatStreamHandlers {
   onDelta: (text: string) => void;
   onProposal: (proposal: ChatProposal) => void;
+  onToolStep: (step: ToolStep) => void;
+  onAction: (action: AgentAction) => void;
   onError: (message: string) => void;
   onDone: () => void;
 }
@@ -68,6 +71,8 @@ export const api = {
 
   sessionPrompt: () => req<{ prompt: string }>("/api/prompts/session"),
 
+  skills: () => req<Skill[]>("/api/skills"),
+
   // Compile unsaved data to a PDF blob for the live preview.
   previewPdf: async (data: unknown): Promise<Blob> => {
     const res = await fetch("/api/preview/pdf", {
@@ -97,7 +102,7 @@ export const api = {
   // Stream one assistant turn over SSE, dispatching frames to handlers.
   chatStream: async (
     thread: string,
-    body: { message: string; model?: string; current_data?: unknown },
+    body: { message: string; model?: string; current_data?: unknown; skill?: string },
     h: ChatStreamHandlers
   ): Promise<void> => {
     const res = await fetch(`/api/chat/${encodeURIComponent(thread)}`, {
@@ -131,6 +136,8 @@ export const api = {
         const evt = JSON.parse(line.slice(6)) as { type: string; data: unknown };
         if (evt.type === "delta") h.onDelta(evt.data as string);
         else if (evt.type === "proposal") h.onProposal(evt.data as ChatProposal);
+        else if (evt.type === "tool_step") h.onToolStep(evt.data as ToolStep);
+        else if (evt.type === "action") h.onAction(evt.data as AgentAction);
         else if (evt.type === "error") h.onError(evt.data as string);
         else if (evt.type === "done") h.onDone();
       }
