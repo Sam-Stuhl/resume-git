@@ -75,6 +75,23 @@ async def test_tailor_requires_base(client):
     assert r.status_code == 400
 
 
+async def test_preview_pdf(client):
+    from core.pdf import pdflatex_available
+
+    # Missing personal -> 422 regardless of pdflatex.
+    r = await client.post("/api/preview/pdf", json={"data": {"summary": "x"}})
+    assert r.status_code == 422
+
+    if not pdflatex_available():
+        return
+    # Full data compiles.
+    r = await client.post("/api/preview/pdf", json={"data": SAMPLE})
+    assert r.status_code == 200 and r.content[:4] == b"%PDF"
+    # Partial data (only a name) still renders — preview is lenient.
+    r = await client.post("/api/preview/pdf", json={"data": {"personal": {"name": "A"}}})
+    assert r.status_code == 200 and r.content[:4] == b"%PDF"
+
+
 async def test_import_bundle(client):
     bundle = {
         "current_version": 2,

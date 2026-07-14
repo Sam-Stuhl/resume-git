@@ -1,62 +1,45 @@
-"""Canonical resume schema + validation.
+"""Validation for the flexible ``{personal, sections}`` resume model.
 
-Enforces the "schema is sacred" rule from the session prompt: the JSON that the
-tool stores must have exactly the known top-level keys and the right shapes. The
-CLI only checked for ``personal.name``; this centralizes a fuller check used by
-both the manual-paste and AI-tailoring paths before anything is committed.
+``validate`` normalizes first (so legacy fixed-schema data is accepted and
+upgraded), then checks the header and every typed section. It returns the
+normalized data, which the services layer stores — so new commits are saved in
+the section model.
 """
 
 from __future__ import annotations
 
-TOP_LEVEL_KEYS = {
-    "personal", "summary", "experience", "projects",
-    "leadership", "skills", "education",
-}
+from core.sections import SECTION_TYPES, normalize
 
 PERSONAL_KEYS = {"name", "email", "phone", "github", "linkedin"}
 
 
 class SchemaError(ValueError):
-    """Raised when resume data does not match the canonical schema.
-
-    ``problems`` holds every issue found so the UI can show them all at once.
-    """
+    """Raised when resume data does not match the schema. ``problems`` lists all."""
 
     def __init__(self, problems: list[str]) -> None:
         self.problems = problems
         super().__init__("; ".join(problems))
 
 
-def _is_role_list(value, label: str, problems: list[str]) -> None:
-    if not isinstance(value, list):
-        problems.append(f"{label} must be a list")
+def _check_entries(entries, label: str, required: list[str], problems: list[str]) -> None:
+    if not isinstance(entries, list):
+        problems.append(f"{label}.entries must be a list")
         return
-    for i, item in enumerate(value):
-        if not isinstance(item, dict):
-            problems.append(f"{label}[{i}] must be an object")
+    for i, e in enumerate(entries):
+        if not isinstance(e, dict):
+            problems.append(f"{label}.entries[{i}] must be an object")
             continue
-        if not item.get("title"):
-            problems.append(f"{label}[{i}] missing 'title'")
-        if not item.get("organization"):
-            problems.append(f"{label}[{i}] missing 'organization'")
-        if "bullets" in item and not isinstance(item["bullets"], list):
-            problems.append(f"{label}[{i}].bullets must be a list")
+        for field in required:
+            if not e.get(field):
+                problems.append(f"{label}.entries[{i}] missing '{field}'")
+        if "bullets" in e and not isinstance(e["bullets"], list):
+            problems.append(f"{label}.entries[{i}].bullets must be a list")
 
 
 def validate(data) -> dict:
-    """Validate resume ``data`` against the canonical schema.
-
-    Returns the data unchanged on success; raises :class:`SchemaError` listing
-    every problem otherwise.
-    """
+    """Validate resume ``data``; return it normalized to the section model."""
     problems: list[str] = []
-
-    if not isinstance(data, dict):
-        raise SchemaError(["top-level value must be a JSON object"])
-
-    unknown = set(data) - TOP_LEVEL_KEYS
-    if unknown:
-        problems.append(f"unknown top-level key(s): {', '.join(sorted(unknown))}")
+    data = normalize(data)
 
     personal = data.get("personal")
     if not isinstance(personal, dict):
@@ -64,40 +47,45 @@ def validate(data) -> dict:
     else:
         if not personal.get("name"):
             problems.append("personal.name is required")
-        unknown_p = set(personal) - PERSONAL_KEYS
-        if unknown_p:
-            problems.append(f"unknown personal key(s): {', '.join(sorted(unknown_p))}")
+        unknown = set(personal) - PERSONAL_KEYS
+        if unknown:
+            problems.append(f"unknown personal key(s): {', '.join(sorted(unknown))}")
 
-    if "summary" in data and not isinstance(data["summary"], str):
-        problems.append("'summary' must be a string")
-
-    if "experience" in data:
-        _is_role_list(data["experience"], "experience", problems)
-    if "leadership" in data:
-        _is_role_list(data["leadership"], "leadership", problems)
-
-    if "projects" in data:
-        if not isinstance(data["projects"], list):
-            problems.append("'projects' must be a list")
-        else:
-            for i, p in enumerate(data["projects"]):
-                if not isinstance(p, dict):
-                    problems.append(f"projects[{i}] must be an object")
-                elif not p.get("name"):
-                    problems.append(f"projects[{i}] missing 'name'")
-
-    if "skills" in data and not isinstance(data["skills"], dict):
-        problems.append("'skills' must be an object of category -> string")
-
-    if "education" in data:
-        if not isinstance(data["education"], list):
-            problems.append("'education' must be a list")
-        else:
-            for i, ed in enumerate(data["education"]):
-                if not isinstance(ed, dict):
-                    problems.append(f"education[{i}] must be an object")
-                elif not ed.get("school"):
-                    problems.append(f"education[{i}] missing 'school'")
+    sections = data.get("sections")
+    if not isinstance(sections, list):
+        problems.append("'sections' must be a list")
+    else:
+        for i, s in enumerate(sections):
+            label = f"sections[{i}]"
+            if not isinstance(s, dict):
+                problems.append(f"{label} must be an object")
+                continue
+            t = s.get("type")
+            if t not in SECTION_TYPES:
+                problems.append(f"{label} has unknown type {t!r}")
+                continue
+            if not isinstance(s.get("title", ""), str):
+                problems.append(f"{label}.title must be a string")
+            if t == "text":
+                if not isinstance(s.get("text", ""), str):
+                    problems.append(f"{label}.text must be a string")
+            elif t == "roles":
+                _check_entries(s.get("entries", []), label, ["title", "organization"], problems)
+            elif t == "projects":
+                _check_entries(s.get("entries", []), label, ["name"], problems)
+            elif t == "education":
+                _check_entries(s.get("entries", []), label, ["school"], problems)
+            elif t == "skills":
+                groups = s.get("groups", [])
+                if not isinstance(groups, list):
+                    problems.append(f"{label}.groups must be a list")
+                else:
+                    for j, g in enumerate(groups):
+                        if not isinstance(g, dict) or not g.get("category"):
+                            problems.append(f"{label}.groups[{j}] needs a 'category'")
+            elif t == "bullets":
+                if not isinstance(s.get("items", []), list):
+                    problems.append(f"{label}.items must be a list")
 
     if problems:
         raise SchemaError(problems)

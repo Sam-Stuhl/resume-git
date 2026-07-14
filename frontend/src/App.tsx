@@ -1,15 +1,46 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "./api";
 import type { Me, VersionDetail, VersionMeta } from "./types";
-import { VersionList } from "./components/VersionList";
-import { Editor } from "./components/Editor";
-import { TailorPanel } from "./components/TailorPanel";
+import { BranchRail } from "./components/BranchRail";
+import { Workbench } from "./components/Workbench";
+import { BranchFlow } from "./components/BranchFlow";
 import { PdfPreview } from "./components/PdfPreview";
-import { DiffPanel } from "./components/DiffPanel";
+import { Compare } from "./components/Compare";
+import { NetworkGraph } from "./components/NetworkGraph";
+import { CommitModal } from "./components/CommitModal";
 import { Settings } from "./components/Settings";
 import { ImportPanel } from "./components/ImportPanel";
+import { GitBranchIcon, MenuIcon } from "./components/icons";
+import { branchName, ref } from "./lib/git";
 
-type Tab = "edit" | "tailor" | "pdf" | "diff" | "settings";
+type View = "edit" | "compare" | "network" | "pdf" | "settings" | "tailor";
+const TABS: { id: View; label: string }[] = [
+  { id: "edit", label: "Edit" },
+  { id: "compare", label: "Compare" },
+  { id: "network", label: "Network" },
+  { id: "pdf", label: "PDF" },
+  { id: "settings", label: "Settings" },
+];
+
+const SKELETON: VersionDetail = {
+  version: 0, created_at: "", label: null, is_base: true, forked_from: null,
+  json_hash: "", jd_text: null,
+  data: {
+    personal: { name: "", email: "", phone: "", github: "", linkedin: "" },
+    sections: [],
+  },
+};
+
+function useTheme() {
+  const [theme, setTheme] = useState<string>(() => localStorage.getItem("theme") || "system");
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === "system") root.removeAttribute("data-theme");
+    else root.setAttribute("data-theme", theme);
+    localStorage.setItem("theme", theme);
+  }, [theme]);
+  return { theme, setTheme };
+}
 
 export default function App() {
   const [me, setMe] = useState<Me | null>(null);
@@ -17,8 +48,16 @@ export default function App() {
   const [current, setCurrent] = useState<number | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [detail, setDetail] = useState<VersionDetail | null>(null);
-  const [tab, setTab] = useState<Tab>("edit");
+  const [view, setView] = useState<View>("edit");
+  const [modalVersion, setModalVersion] = useState<number | null>(null);
+  const [railOpen, setRailOpen] = useState<boolean>(() => {
+    const s = localStorage.getItem("railOpen");
+    return s == null ? window.innerWidth > 820 : s === "1";
+  });
   const [fatal, setFatal] = useState("");
+  const { theme, setTheme } = useTheme();
+
+  useEffect(() => { localStorage.setItem("railOpen", railOpen ? "1" : "0"); }, [railOpen]);
 
   const refresh = useCallback(async (selectVersion?: number) => {
     const vs = await api.versions();
@@ -30,9 +69,8 @@ export default function App() {
       cur = null;
     }
     setCurrent(cur);
-    const pick = selectVersion ?? selected ?? cur ?? (vs[0]?.version ?? null);
-    setSelected(pick);
-  }, [selected]);
+    setSelected((prev) => selectVersion ?? prev ?? cur ?? vs[0]?.version ?? null);
+  }, []);
 
   useEffect(() => {
     api
@@ -40,8 +78,7 @@ export default function App() {
       .then(setMe)
       .catch((e) => setFatal((e as ApiError).status === 401 ? "Not authenticated." : String(e)));
     refresh().catch((e) => setFatal(String(e)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [refresh]);
 
   useEffect(() => {
     if (selected == null) {
@@ -51,114 +88,115 @@ export default function App() {
     api.version(selected).then(setDetail).catch(() => setDetail(null));
   }, [selected]);
 
-  const onSaved = async (v: number) => {
+  const onCommitted = async (v: number) => {
     await refresh(v);
     setMe(await api.me());
-    setTab("pdf");
   };
 
-  const makeCurrent = async () => {
+  const checkout = async () => {
     if (selected == null) return;
     await api.setCurrent(selected);
     await refresh(selected);
-  };
-  const restore = async () => {
-    if (selected == null) return;
-    const res = await api.restore(selected);
-    await refresh(res.version);
   };
 
   if (fatal) return <div style={{ padding: 24 }} className="err">{fatal}</div>;
 
   const empty = versions.length === 0;
+  const headMeta = versions.find((v) => v.version === current);
+  const onMain = headMeta ? headMeta.is_base : true;
+  const editDetail = detail ?? (empty ? SKELETON : null);
 
   return (
     <div className="app">
-      <div className="topbar">
-        <h1>Resume Manager</h1>
-        <span className="meta">
-          {me?.email} · {me?.ai_enabled ? "AI on" : "copy-paste mode"}
-          {current != null && ` · current v${String(current).padStart(4, "0")}`}
+      <div className="appbar">
+        <button className="icon-btn" title="Toggle history" onClick={() => setRailOpen((o) => !o)}>
+          <MenuIcon size={16} />
+        </button>
+        <span className="wordmark"><GitBranchIcon size={16} className="wm-ico" /> resume-git</span>
+        <span className={"branch-pill " + (onMain ? "main" : "branch")}>
+          <GitBranchIcon size={12} /> {headMeta ? branchName(headMeta) : "main"}
         </span>
+        {current != null && <span className="head-badge">HEAD {ref(current)}</span>}
+        <span className="spacer" />
+        <button className="accent branch-btn" onClick={() => setView("tailor")} disabled={empty}>
+          <GitBranchIcon size={14} /> <span className="nb-text">New branch</span>
+        </button>
       </div>
 
       <div className="layout">
-        <aside className="sidebar">
-          {empty ? (
-            <p className="muted">No versions yet. Paste a base resume JSON in the Edit tab and “Save as new base”.</p>
-          ) : (
-            <>
-              <VersionList
-                versions={versions}
-                selected={selected}
-                current={current}
-                onSelect={setSelected}
-              />
-              {selected != null && (
-                <div className="row" style={{ marginTop: 10 }}>
-                  <button onClick={makeCurrent} disabled={selected === current}>Make current</button>
-                  <button onClick={restore}>Restore</button>
-                </div>
-              )}
-            </>
-          )}
-        </aside>
+        {railOpen && (
+          <aside className="sidebar">
+            {empty ? (
+              <p className="muted" style={{ padding: "6px 10px" }}>No commits yet. Add your resume on the Edit tab, or import from the CLI.</p>
+            ) : (
+              <>
+                <BranchRail
+                  versions={versions}
+                  selected={selected}
+                  current={current}
+                  onSelect={setSelected}
+                  onOpen={setModalVersion}
+                />
+                {selected != null && selected !== current && (
+                  <div className="row" style={{ margin: "10px 12px" }}>
+                    <button className="green" onClick={checkout}>Checkout {ref(selected)}</button>
+                  </div>
+                )}
+              </>
+            )}
+          </aside>
+        )}
 
         <main className="main">
           <nav className="tabs">
-            {(["edit", "tailor", "pdf", "diff", "settings"] as Tab[]).map((t) => (
-              <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>
-                {t === "pdf" ? "PDF" : t[0].toUpperCase() + t.slice(1)}
+            {TABS.map((t) => (
+              <button key={t.id} className={"tab" + (view === t.id ? " active" : "")} onClick={() => setView(t.id)}>
+                {t.label}
               </button>
             ))}
           </nav>
-          <div className="content">
-            {tab === "edit" &&
-              (detail ? (
-                <Editor detail={detail} onSaved={onSaved} />
-              ) : (
+
+          {view === "edit" ? (
+            editDetail ? (
+              <div className="edit-fill">
+                {empty && (
+                  <div style={{ padding: 16, borderBottom: "1px solid var(--border)" }}>
+                    <ImportPanel onImported={() => refresh()} />
+                  </div>
+                )}
+                <Workbench detail={editDetail} onCommitted={onCommitted} />
+              </div>
+            ) : (
+              <div className="content"><p className="muted">Loading…</p></div>
+            )
+          ) : view === "network" ? (
+            !empty ? (
+              <div className="net-fill">
+                <NetworkGraph versions={versions} current={current} selected={selected} onSelect={setSelected} onOpen={setModalVersion} />
+              </div>
+            ) : (
+              <div className="content"><p className="muted">No commits yet.</p></div>
+            )
+          ) : (
+            <div className="content">
+              {view === "tailor" && me && <BranchFlow me={me} onCreated={onCommitted} />}
+              {view === "pdf" && selected != null && <PdfPreview version={selected} />}
+              {view === "compare" && !empty && selected != null && (
+                <Compare versions={versions} selected={selected} />
+              )}
+              {view === "settings" && me && (
                 <>
-                  {empty && <ImportPanel onImported={() => refresh()} />}
-                  <EmptyEditor onSaved={onSaved} />
+                  <Settings me={me} theme={theme} setTheme={setTheme} onChange={async () => setMe(await api.me())} />
+                  <ImportPanel onImported={() => refresh()} />
                 </>
-              ))}
-            {tab === "tailor" && me && <TailorPanel me={me} onSaved={onSaved} />}
-            {tab === "pdf" && selected != null && <PdfPreview version={selected} />}
-            {tab === "diff" && !empty && selected != null && (
-              <DiffPanel versions={versions} selected={selected} />
-            )}
-            {tab === "settings" && me && (
-              <>
-                <Settings me={me} onChange={async () => setMe(await api.me())} />
-                <ImportPanel onImported={() => refresh()} />
-              </>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </main>
       </div>
+      {modalVersion != null && (
+        <CommitModal versions={versions} version={modalVersion} onClose={() => setModalVersion(null)} />
+      )}
     </div>
   );
-}
-
-// When there are no versions yet, offer a blank base editor seeded with the schema shape.
-function EmptyEditor({ onSaved }: { onSaved: (v: number) => void }) {
-  const skeleton: VersionDetail = {
-    version: 0,
-    created_at: "",
-    label: null,
-    is_base: true,
-    forked_from: null,
-    json_hash: "",
-    jd_text: null,
-    data: {
-      personal: { name: "", email: "", phone: "", github: "", linkedin: "" },
-      summary: "",
-      experience: [],
-      projects: [],
-      leadership: [],
-      skills: {},
-      education: [],
-    },
-  };
-  return <Editor detail={skeleton} onSaved={onSaved} />;
 }

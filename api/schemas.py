@@ -69,3 +69,7 @@ class ImportIn(BaseModel):
     versions: list[dict]
     current_version: int | None = None
     replace: bool = False
+
+
+class PreviewIn(BaseModel):
+    data: dict

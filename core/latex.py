@@ -7,6 +7,8 @@ functions are pure: they take resume ``dict`` data and return LaTeX strings.
 
 from __future__ import annotations
 
+from core.sections import normalize
+
 LATEX_SPECIAL_CHARS = {
     "\\": r"\textbackslash{}",
     "&": r"\&", "%": r"\%", "$": r"\$", "#": r"\#",
@@ -76,11 +78,12 @@ PREAMBLE = r"""
 
 
 def render_header(personal: dict) -> str:
-    name = tex_escape(personal["name"])
-    email = tex_escape(personal["email"])
-    phone = tex_escape(personal["phone"])
-    github = personal["github"]
-    linkedin = personal["linkedin"]
+    # Tolerant of partial data so the live preview never crashes mid-edit.
+    name = tex_escape(personal.get("name", ""))
+    email = tex_escape(personal.get("email", ""))
+    phone = tex_escape(personal.get("phone", ""))
+    github = personal.get("github", "")
+    linkedin = personal.get("linkedin", "")
     return (
         r"\begin{center}" + "\n"
         + rf"    \textbf{{\Huge \scshape {name}}} \\ \vspace{{1pt}}" + "\n"
@@ -91,16 +94,16 @@ def render_header(personal: dict) -> str:
     )
 
 
-def render_summary(summary: str) -> str:
-    if not summary:
+def render_text(title: str, text: str) -> str:
+    if not text:
         return ""
-    return f"\n\\section*{{Summary}}\n\\small {tex_escape(summary)}\n\\vspace{{2pt}}\n"
+    return f"\n\\section*{{{tex_escape(title)}}}\n\\small {tex_escape(text)}\n\\vspace{{2pt}}\n"
 
 
 def render_role_block(items: list, section_title: str) -> str:
     if not items:
         return ""
-    out = [f"\n\\section{{{section_title}}}", r"\resumeSubHeadingListStart"]
+    out = [f"\n\\section{{{tex_escape(section_title)}}}", r"\resumeSubHeadingListStart"]
     for job in items:
         title = tex_escape(job["title"])
         org = tex_escape(job["organization"])
@@ -118,11 +121,11 @@ def render_role_block(items: list, section_title: str) -> str:
     return "\n".join(out)
 
 
-def render_projects(projects: list) -> str:
-    if not projects:
+def render_projects(entries: list, title: str = "Projects") -> str:
+    if not entries:
         return ""
-    out = ["\n\\section{Projects}", r"\resumeSubHeadingListStart"]
-    for p in projects:
+    out = [f"\n\\section{{{tex_escape(title)}}}", r"\resumeSubHeadingListStart"]
+    for p in entries:
         name = tex_escape(p["name"])
         stack = tex_escape(p.get("stack", ""))
         heading = rf"\textbf{{{name}}} $|$ \emph{{{stack}}}" if stack else rf"\textbf{{{name}}}"
@@ -136,24 +139,27 @@ def render_projects(projects: list) -> str:
     return "\n".join(out)
 
 
-def render_skills(skills: dict) -> str:
-    if not skills:
+def render_skills(groups: list, title: str = "Technical Skills") -> str:
+    if not groups:
         return ""
-    rows = [rf"\textbf{{{tex_escape(k)}}}{{: {tex_escape(v)}}}" for k, v in skills.items()]
+    rows = [
+        rf"\textbf{{{tex_escape(g.get('category', ''))}}}{{: {tex_escape(g.get('items', ''))}}}"
+        for g in groups
+    ]
     body = " \\\\\n     ".join(rows)
     return (
-        "\n\\section{Technical Skills}\n"
+        f"\n\\section{{{tex_escape(title)}}}\n"
         " \\begin{itemize}[leftmargin=0.15in, label={}]\n"
         f"    \\small{{\\item{{\n     {body} \\\\\n    }}}}\n"
         " \\end{itemize}\n"
     )
 
 
-def render_education(education: list) -> str:
-    if not education:
+def render_education(entries: list, title: str = "Education") -> str:
+    if not entries:
         return ""
-    out = ["\n\\section{Education}", r"\resumeSubHeadingListStart"]
-    for ed in education:
+    out = [f"\n\\section{{{tex_escape(title)}}}", r"\resumeSubHeadingListStart"]
+    for ed in entries:
         school = tex_escape(ed["school"])
         location = tex_escape(ed.get("location", ""))
         gpa = tex_escape(ed.get("gpa", ""))
@@ -170,15 +176,40 @@ def render_education(education: list) -> str:
     return "\n".join(out)
 
 
+def render_bullets(title: str, items: list) -> str:
+    items = [i for i in items if i]  # drop empty rows
+    if not items:
+        return ""
+    out = [f"\n\\section{{{tex_escape(title)}}}", r"\begin{itemize}[leftmargin=0.15in]"]
+    for item in items:
+        out.append(rf"    \item \small {tex_escape(item)}")
+    out.append(r"\end{itemize}\vspace{-4pt}")
+    return "\n".join(out)
+
+
+_RENDERERS = {
+    "text": lambda s: render_text(s.get("title", ""), s.get("text", "")),
+    "roles": lambda s: render_role_block(s.get("entries", []), s.get("title", "")),
+    "projects": lambda s: render_projects(s.get("entries", []), s.get("title", "Projects")),
+    "skills": lambda s: render_skills(s.get("groups", []), s.get("title", "Technical Skills")),
+    "education": lambda s: render_education(s.get("entries", []), s.get("title", "Education")),
+    "bullets": lambda s: render_bullets(s.get("title", ""), s.get("items", [])),
+}
+
+
+def render_section(sec: dict) -> str:
+    """Dispatch a single typed section to its renderer. Unknown types render nothing."""
+    renderer = _RENDERERS.get(sec.get("type", ""))
+    return renderer(sec) if renderer else ""
+
+
 def build_latex(data: dict) -> str:
-    """Assemble the full LaTeX document from JSON resume data."""
+    """Assemble the full LaTeX document from the (normalized) section model."""
+    data = normalize(data)
     parts = [PREAMBLE, r"\begin{document}", render_header(data["personal"])]
-    if data.get("summary"):
-        parts.append(render_summary(data["summary"]))
-    parts.append(render_role_block(data.get("experience", []), "Experience"))
-    parts.append(render_projects(data.get("projects", [])))
-    parts.append(render_role_block(data.get("leadership", []), "Leadership \\& Extracurriculars"))
-    parts.append(render_skills(data.get("skills", {})))
-    parts.append(render_education(data.get("education", [])))
+    for sec in data["sections"]:
+        rendered = render_section(sec)
+        if rendered:
+            parts.append(rendered)
     parts.append(r"\end{document}")
     return "\n".join(parts)
