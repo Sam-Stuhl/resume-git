@@ -7,6 +7,7 @@ import { TailorFlow } from "./components/TailorFlow";
 import { PdfPreview } from "./components/PdfPreview";
 import { Compare } from "./components/Compare";
 import { NetworkGraph } from "./components/NetworkGraph";
+import { CommitModal } from "./components/CommitModal";
 import { Settings } from "./components/Settings";
 import { ImportPanel } from "./components/ImportPanel";
 import { branchName, ref } from "./lib/git";
@@ -49,6 +50,7 @@ export default function App() {
   const [selected, setSelected] = useState<number | null>(null);
   const [detail, setDetail] = useState<VersionDetail | null>(null);
   const [view, setView] = useState<View>("edit");
+  const [modalVersion, setModalVersion] = useState<number | null>(null);
   const [fatal, setFatal] = useState("");
   const theme = useTheme();
 
@@ -124,7 +126,7 @@ export default function App() {
             <p className="muted">No commits yet. Add your resume on the Edit tab, or import from the CLI.</p>
           ) : (
             <>
-              <BranchRail versions={versions} selected={selected} current={current} onSelect={setSelected} />
+              <BranchRail versions={versions} selected={selected} current={current} onSelect={setSelected} onOpen={setModalVersion} />
               {selected != null && selected !== current && (
                 <div className="row" style={{ marginTop: 12 }}>
                   <button className="green" onClick={checkout}>Checkout {ref(selected)}</button>
@@ -164,7 +166,7 @@ export default function App() {
                 <Compare versions={versions} selected={selected} />
               )}
               {view === "network" && !empty && (
-                <NetworkGraph versions={versions} current={current} selected={selected} onSelect={setSelected} />
+                <NetworkGraph versions={versions} current={current} selected={selected} onSelect={setSelected} onOpen={setModalVersion} />
               )}
               {view === "settings" && me && (
                 <>
@@ -176,6 +178,9 @@ export default function App() {
           )}
         </main>
       </div>
+      {modalVersion != null && (
+        <CommitModal versions={versions} version={modalVersion} onClose={() => setModalVersion(null)} />
+      )}
     </div>
   );
 }

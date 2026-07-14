@@ -6,6 +6,7 @@ interface Props {
   selected: number | null;
   current: number | null;
   onSelect: (v: number) => void;
+  onOpen?: (v: number) => void;
 }
 
 /**
@@ -13,7 +14,7 @@ interface Props {
  * indented under the commit they forked from. HEAD marks the checked-out
  * version. Clicking a node views it; checkout happens elsewhere.
  */
-export function BranchRail({ versions, selected, current, onSelect }: Props) {
+export function BranchRail({ versions, selected, current, onSelect, onOpen }: Props) {
   // Newest first, same as the API returns.
   return (
     <div>
@@ -30,7 +31,8 @@ export function BranchRail({ versions, selected, current, onSelect }: Props) {
               (v.is_base ? "" : " branch")
             }
             onClick={() => onSelect(v.version)}
-            title={v.is_base ? "commit on main" : `branch · ${branchName(v)}`}
+            onDoubleClick={() => onOpen?.(v.version)}
+            title={(v.is_base ? "commit on main" : `branch · ${branchName(v)}`) + " — double-click for details"}
           >
             <span className="rail-graph">
               <span

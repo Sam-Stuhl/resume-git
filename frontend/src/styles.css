@@ -196,6 +196,32 @@ pre.diff { margin: 0; font-family: var(--mono); font-size: 12px; line-height: 1.
 .gnode { transition: r .1s ease; }
 .grow:hover .gcell circle:last-of-type { r: 6.5; }
 
+/* ── Commit-detail modal ── */
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 24px; }
+.modal { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; width: min(780px, 100%); max-height: 86vh; display: flex; flex-direction: column; box-shadow: 0 16px 48px rgba(0,0,0,.45); }
+.modal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--border); }
+.modal-title { font-size: 16px; font-weight: 600; }
+.modal-jd { margin: 12px 18px 0; }
+.jd-text { white-space: pre-wrap; font-family: var(--mono); font-size: 12px; color: var(--muted); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px; max-height: 180px; overflow: auto; margin: 6px 0 0; }
+.modal-body { padding: 14px 18px 18px; overflow: auto; }
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .workbench { grid-template-columns: 1fr; }
+  .wb-editor { border-right: none; border-bottom: 1px solid var(--border); }
+  .wb-preview { min-height: 420px; }
+}
+@media (max-width: 720px) {
+  .appbar { flex-wrap: wrap; row-gap: 6px; }
+  .appbar .who { display: none; }
+  .tabs { overflow-x: auto; }
+  .tab { white-space: nowrap; }
+  .layout { flex-direction: column; }
+  .sidebar { width: auto; max-height: 34vh; border-right: none; border-bottom: 1px solid var(--border); }
+  .editor { max-width: none; }
+  .sec-head { flex-wrap: wrap; }
+}
+
 iframe.pdf { width: 100%; height: 100%; min-height: 70vh; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; }
 
 /* ── Section editor ── */

@@ -10,12 +10,13 @@ const CY = ROW_H / 2;
  * alignment. Rows hover, select, and mark HEAD.
  */
 export function NetworkGraph({
-  versions, current, selected, onSelect,
+  versions, current, selected, onSelect, onOpen,
 }: {
   versions: VersionMeta[];
   current: number | null;
   selected: number | null;
   onSelect: (v: number) => void;
+  onOpen?: (v: number) => void;
 }) {
   const graphRows = computeGraphRows(versions);
   const laneCount = graphRows[0]?.laneCount ?? 1;
@@ -36,7 +37,8 @@ export function NetworkGraph({
               key={v.version}
               className={"grow" + (isSel ? " sel" : "") + (isHead ? " head" : "")}
               onClick={() => onSelect(v.version)}
-              title={`${ref(v.version)} · ${v.is_base ? "main" : branchName(v)}${v.label ? " · " + v.label : ""}`}
+              onDoubleClick={() => onOpen?.(v.version)}
+              title={`${ref(v.version)} · ${v.is_base ? "main" : branchName(v)}${v.label ? " · " + v.label : ""} — double-click for details`}
             >
               <svg className="gcell" width={cellW} height={ROW_H} aria-hidden="true">
                 {gr.through.map((l) => <line key={"t" + l} x1={xLane(l)} y1={0} x2={xLane(l)} y2={ROW_H} stroke={stroke(l)} strokeWidth={2} />)}
