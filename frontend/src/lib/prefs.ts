@@ -1,5 +1,5 @@
 // Client-side UI preferences, persisted in localStorage (same pattern as theme).
-// These are device-local behavior toggles, not account data — the server never
+// These are device-local behavior toggles, not account data; the server never
 // sees them. Read on load to seed initial UI state; write on change.
 
 export type LandingTab = "edit" | "compare" | "network" | "pdf";

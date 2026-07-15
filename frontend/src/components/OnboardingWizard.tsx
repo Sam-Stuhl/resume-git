@@ -97,7 +97,7 @@ export function OnboardingWizard({
             <h1 className="onb-title"><GitBranchIcon size={20} /> Welcome to resume-git</h1>
             <p className="onb-lead">
               Version control for your résumé. One canonical résumé is your <strong>base</strong>;
-              branch off it to tailor for a specific job, review the diff, and compile to a PDF —
+              branch off it to tailor for a specific job, review the diff, and compile to a PDF,
               all without ever losing history.
             </p>
             <p className="muted onb-sub">Let's set up your base résumé. It takes a minute.</p>
@@ -189,9 +189,9 @@ export function OnboardingWizard({
             <h2 className="onb-title">Connect Claude (optional)</h2>
             <p className="onb-lead">Your base is saved. The assistant can tailor, audit, and update it. Two ways to use it:</p>
             <ul className="onb-list">
-              <li><strong>Claude Code token</strong> — run <code>claude setup-token</code> and paste the <code>sk-ant-oat…</code> it prints (bills your Claude subscription).</li>
-              <li><strong>Claude API key</strong> — an <code>sk-ant-api…</code> key from the Anthropic console (bills API credits).</li>
-              <li><strong>No key</strong> — use the built-in <strong>copy-paste assistant</strong> with any Claude.ai chat.</li>
+              <li><strong>Claude Code token:</strong> run <code>claude setup-token</code> and paste the <code>sk-ant-oat…</code> it prints (bills your Claude subscription).</li>
+              <li><strong>Claude API key:</strong> an <code>sk-ant-api…</code> key from the Anthropic console (bills API credits).</li>
+              <li><strong>No key:</strong> use the built-in <strong>copy-paste assistant</strong> with any AI chat.</li>
             </ul>
             <div className="field">
               <label>Paste a credential now (optional)</label>
@@ -204,7 +204,7 @@ export function OnboardingWizard({
             </div>
             <div className="row" style={{ marginTop: 8 }}>
               <button className="accent" onClick={() => onFinish()}>
-                {keySaved ? "Finish" : "Skip — I'll use copy-paste"}
+                {keySaved ? "Finish" : "Skip, I'll use copy-paste"}
               </button>
             </div>
           </div>

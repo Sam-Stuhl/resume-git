@@ -128,7 +128,7 @@ export function Settings({
             <div className="field">
               <label>Email</label>
               <input value={me.email} readOnly disabled />
-              <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>Set by your sign-in — can't be changed here.</div>
+              <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>Set by your sign-in; can't be changed here.</div>
             </div>
           </div>
         )}
@@ -137,7 +137,7 @@ export function Settings({
           <div className="card">
             <p className="section-title">AI &amp; credentials</p>
             <div className="field">
-              <label>Claude credential — API key or Claude Code token (write-only)</label>
+              <label>Claude credential: API key or Claude Code token (write-only)</label>
               <div className="row">
                 <input type="password" value={key} onChange={(e) => setKey(e.target.value)}
                   placeholder={me.credential_kind ? "•••• (a credential is set)" : "sk-ant-api… or sk-ant-oat…"}
@@ -230,7 +230,7 @@ export function Settings({
               </a>
             ) : (
               <p className="muted" style={{ fontSize: 12 }}>
-                Sign-in is managed by Cloudflare Access — there's no session to log out of in local dev.
+                Sign-in is managed by Cloudflare Access; there's no session to log out of in local dev.
               </p>
             )}
           </div>

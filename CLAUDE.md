@@ -2,7 +2,7 @@
 
 ## Commit discipline
 
-**Commit change by change — not one big commit at the end.** As you implement,
+**Commit change by change, not one big commit at the end.** As you implement,
 commit each logical, self-contained change on its own (a bug fix, one endpoint, a
 component, a settings module) with a clear message, rather than batching an entire
 feature into a single commit. Each commit should leave the tree in a coherent,

@@ -11,7 +11,7 @@ export function LivePdfPreview({ data }: { data: Resume }) {
   const [loading, setLoading] = useState(false);
   const [stale, setStale] = useState(false);
   const objRef = useRef<string>("");
-  // Read once on mount — Settings unmounts the editor, so this re-reads on return.
+  // Read once on mount. Settings unmounts the editor, so this re-reads on return.
   const [autoCompile] = useState(() => prefs.autoCompile());
 
   const compile = useCallback((d: Resume) => {
@@ -69,7 +69,7 @@ export function LivePdfPreview({ data }: { data: Resume }) {
       ) : url ? (
         <>
           {!autoCompile && stale && (
-            <p className="muted" style={{ fontSize: 12, marginBottom: 6 }}>Edited — recompile to update.</p>
+            <p className="muted" style={{ fontSize: 12, marginBottom: 6 }}>Edited. Recompile to update.</p>
           )}
           <iframe className="pdf" src={url} title="live preview" style={{ flex: 1 }} />
         </>
