@@ -5,14 +5,14 @@ from __future__ import annotations
 import asyncio
 import json
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import services
 from api import limits, schemas
-from api.deps import get_current_user
+from api.deps import ACCESS_EMAIL_HEADER, get_current_user
 from core import agent, ai, prompts, schema
 from core import skills as skills_registry
 from core import tools as agent_tools
@@ -76,30 +76,43 @@ async def _ai_state(session: AsyncSession, user_id: int) -> tuple[bool, str]:
     return (bool(key) and enabled, model)
 
 
-async def _me(session: AsyncSession, user: User) -> schemas.Me:
+async def _me(
+    session: AsyncSession, user: User, behind_access: bool = False
+) -> schemas.Me:
     ai_enabled, model = await _ai_state(session, user.id)
     key = await repo.get_config(session, user.id, KEY_API)
     return schemas.Me(
         email=user.email, ai_enabled=ai_enabled, default_model=model,
         credential_kind=_credential_kind(key),
+        display_name=user.display_name,
+        created_at=user.created_at.isoformat() if user.created_at else None,
+        behind_access=behind_access,
     )
+
+
+def _behind_access(request: Request) -> bool:
+    """True when the request came through Cloudflare Access (the identity header
+    is present). False under the local dev shim — so the UI hides logout."""
+    return bool(request.headers.get(ACCESS_EMAIL_HEADER))
 
 
 # ── Identity / settings ──────────────────────────────────────────────────────
 @router.get("/me", response_model=schemas.Me)
 async def me(
+    request: Request,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    return await _me(session, user)
+    return await _me(session, user, _behind_access(request))
 
 
 @router.get("/settings", response_model=schemas.Me)
 async def get_settings(
+    request: Request,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    return await _me(session, user)
+    return await _me(session, user, _behind_access(request))
 
 
 @router.put("/settings")
@@ -112,6 +125,19 @@ async def put_settings(
         await repo.set_config(session, user.id, KEY_MODEL, body.default_model)
     if body.ai_enabled is not None:
         await repo.set_config(session, user.id, KEY_AI_ENABLED, "1" if body.ai_enabled else "0")
+    if body.display_name is not None:
+        user.display_name = body.display_name.strip() or None  # empty clears it
+    await session.commit()
+    return {"ok": True}
+
+
+@router.delete("/account")
+async def delete_account(
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Permanently delete the signed-in account and all its data."""
+    await repo.delete_user(session, user.id)
     await session.commit()
     return {"ok": True}
 

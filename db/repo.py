@@ -42,6 +42,16 @@ async def get_or_create_user(session: AsyncSession, email: str) -> User:
     return user
 
 
+async def delete_user(session: AsyncSession, user_id: int) -> None:
+    """Delete a user and all their data. Children are removed explicitly (not via
+    FK cascade) because the local SQLite dev DB doesn't enforce foreign keys."""
+    await session.execute(delete(Message).where(Message.user_id == user_id))
+    await session.execute(delete(Config).where(Config.user_id == user_id))
+    await session.execute(delete(Version).where(Version.user_id == user_id))
+    await session.execute(delete(User).where(User.id == user_id))
+    await session.flush()
+
+
 # ── Config ──────────────────────────────────────────────────────────────────
 async def get_config(session: AsyncSession, user_id: int, key: str) -> str | None:
     row = (
