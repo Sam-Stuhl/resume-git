@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, ApiError } from "../api";
 import type { Resume, TailorPreview } from "../types";
 import { slugify } from "../lib/git";
@@ -35,6 +35,21 @@ export function CopyPasteAssistant({
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [err, setErr] = useState("");
+
+  // The "set up a chat" session prompt: résumé + commands, pasted once to start a
+  // conversation that already has your résumé as context.
+  const [session, setSession] = useState("");
+  const [sessionCopied, setSessionCopied] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    api.sessionPrompt().then((r) => { if (alive) setSession(r.prompt); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  async function copySession() {
+    await navigator.clipboard.writeText(session);
+    setSessionCopied(true);
+    setTimeout(() => setSessionCopied(false), 1500);
+  }
 
   const spec = INTENTS.find((i) => i.id === intent)!;
   const needsJd = NEEDS_JD.includes(intent);
@@ -91,9 +106,25 @@ export function CopyPasteAssistant({
 
   return (
     <div className="cp-body">
+      {session && (
+        <div className="card cp-session">
+          <p className="section-title">Set up a chat (recommended)</p>
+          <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
+            Paste this into a new AI chat once. It loads your résumé and the commands, so the chat
+            has your résumé as context and you can ask follow-ups and iterate without re-pasting.
+            When it hands back updated résumé JSON, apply it below.
+          </p>
+          <button onClick={copySession}>{sessionCopied ? "Copied ✓" : "Copy setup prompt"}</button>
+          <details style={{ marginTop: 8 }}>
+            <summary className="muted" style={{ cursor: "pointer", fontSize: 12 }}>Preview the prompt</summary>
+            <textarea rows={6} readOnly value={session} style={{ marginTop: 8 }} />
+          </details>
+        </div>
+      )}
+
       <p className="muted cp-intro">
-        Use any AI chat: pick what you want, copy the prompt, and (for changes)
-        paste the reply back to review it.
+        Or copy a one-off request for a single task: pick what you want, copy the prompt, and
+        (for changes) paste the reply back to review it.
       </p>
 
         <div className="ed-modebar cp-intents">
