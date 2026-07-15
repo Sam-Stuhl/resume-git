@@ -10,6 +10,7 @@ import { NetworkGraph } from "./components/NetworkGraph";
 import { CommitModal } from "./components/CommitModal";
 import { Settings } from "./components/Settings";
 import { ImportPanel } from "./components/ImportPanel";
+import { OnboardingWizard } from "./components/OnboardingWizard";
 import { GitBranchIcon, MenuIcon } from "./components/icons";
 import { branchName, ref } from "./lib/git";
 
@@ -55,6 +56,7 @@ export default function App() {
     return s == null ? window.innerWidth > 820 : s === "1";
   });
   const [fatal, setFatal] = useState("");
+  const [wizardDismissed, setWizardDismissed] = useState(false);
   const { theme, setTheme } = useTheme();
 
   useEffect(() => { localStorage.setItem("railOpen", railOpen ? "1" : "0"); }, [railOpen]);
@@ -102,6 +104,7 @@ export default function App() {
   if (fatal) return <div style={{ padding: 24 }} className="err">{fatal}</div>;
 
   const empty = versions.length === 0;
+  const showWizard = empty && !wizardDismissed;
   const headMeta = versions.find((v) => v.version === current);
   const onMain = headMeta ? headMeta.is_base : true;
   const editDetail = detail ?? (empty ? SKELETON : null);
@@ -157,13 +160,13 @@ export default function App() {
           </nav>
 
           {view === "edit" ? (
-            editDetail ? (
+            showWizard ? (
+              <OnboardingWizard
+                onFinish={async (v) => { setWizardDismissed(true); await onCommitted(v); }}
+                onStartBlank={() => setWizardDismissed(true)}
+              />
+            ) : editDetail ? (
               <div className="edit-fill">
-                {empty && (
-                  <div style={{ padding: 16, borderBottom: "1px solid var(--border)" }}>
-                    <ImportPanel onImported={() => refresh()} />
-                  </div>
-                )}
                 <Workbench detail={editDetail} me={me} onCommitted={onCommitted} onOpenSettings={() => setView("settings")} />
               </div>
             ) : (

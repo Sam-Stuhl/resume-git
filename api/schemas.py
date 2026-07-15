@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+# Upper bounds on free-text inputs, so unbounded Text columns can't be stuffed.
+MAX_JD_LEN = 20_000
+MAX_MESSAGE_LEN = 12_000
 
 
 class Me(BaseModel):
@@ -34,11 +38,11 @@ class BaseIn(BaseModel):
 class TailorIn(BaseModel):
     data: dict
     label: str | None = None
-    jd_text: str | None = None
+    jd_text: str | None = Field(default=None, max_length=MAX_JD_LEN)
 
 
 class TailorPreviewIn(BaseModel):
-    jd_text: str
+    jd_text: str = Field(max_length=MAX_JD_LEN)
     model: str | None = None
 
 
@@ -76,6 +80,24 @@ class PreviewIn(BaseModel):
     data: dict
 
 
+# ── Copy-paste (keyless) assistant ────────────────────────────────────────────
+class CopyPromptIn(BaseModel):
+    intent: str  # "tailor" | "base-update" | "ask" | "ats"
+    jd_text: str | None = Field(default=None, max_length=MAX_JD_LEN)
+    note: str | None = Field(default=None, max_length=MAX_MESSAGE_LEN)
+
+
+class PastePreviewIn(BaseModel):
+    text: str = Field(max_length=200_000)  # a pasted Claude reply (JSON + maybe prose)
+    intent: str = "base-update"  # "tailor" -> diff vs base; else diff vs base too
+
+
+class PastePreviewOut(BaseModel):
+    data: dict
+    diff: list[dict]
+    summary: list[str]
+
+
 # ── Resume Copilot chat ───────────────────────────────────────────────────────
 class ChatMessageOut(BaseModel):
     id: int
@@ -86,7 +108,7 @@ class ChatMessageOut(BaseModel):
 
 
 class ChatSendIn(BaseModel):
-    message: str
+    message: str = Field(max_length=MAX_MESSAGE_LEN)
     model: str | None = None
     current_data: dict | None = None  # the resume in the editor (viewed branch)
     skill: str | None = None

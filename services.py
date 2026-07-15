@@ -8,6 +8,7 @@ current. It ports the bodies of the CLI's ``cmd_base`` / ``cmd_tailor`` /
 from __future__ import annotations
 
 import datetime as dt
+import os
 
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,9 +18,29 @@ from core.util import hash_json
 from db import repo
 from db.models import Config, Version
 
+# Per-user stored-version cap for the open deployment. 0 = unlimited. Every new
+# version is non-destructive (history is a product value), so at the cap we
+# *reject* rather than prune.
+MAX_VERSIONS_PER_USER = int(os.environ.get("MAX_VERSIONS_PER_USER", "0") or "0")
+
 
 class NoBaseError(Exception):
     """No base resume exists yet; create one before tailoring."""
+
+
+class QuotaExceededError(Exception):
+    """The user is at ``MAX_VERSIONS_PER_USER``; no new version can be created."""
+
+    def __init__(self, count: int) -> None:
+        self.count = count
+        super().__init__(f"version quota reached ({count})")
+
+
+async def _enforce_version_quota(session: AsyncSession, user_id: int) -> None:
+    if MAX_VERSIONS_PER_USER:
+        count = await repo.count_versions(session, user_id)
+        if count >= MAX_VERSIONS_PER_USER:
+            raise QuotaExceededError(count)
 
 
 class AlreadyHasDataError(Exception):
@@ -35,6 +56,7 @@ async def create_base(
 ) -> Version:
     """Save ``data`` as a new base version and make it current."""
     data = schema.validate(data)  # normalizes to the section model
+    await _enforce_version_quota(session, user_id)
     v = await repo.next_version(session, user_id)
     row = await repo.insert_version(
         session, user_id,
@@ -59,6 +81,7 @@ async def create_tailor(
     base = await repo.latest_base_version(session, user_id)
     if base is None:
         raise NoBaseError()
+    await _enforce_version_quota(session, user_id)
     v = await repo.next_version(session, user_id)
     row = await repo.insert_version(
         session, user_id,
@@ -76,6 +99,7 @@ async def restore(session: AsyncSession, user_id: int, v: int) -> Version | None
     src = await repo.get_version(session, user_id, v)
     if src is None:
         return None
+    await _enforce_version_quota(session, user_id)
     new_v = await repo.next_version(session, user_id)
     row = await repo.insert_version(
         session, user_id,

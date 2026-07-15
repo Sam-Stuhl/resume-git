@@ -11,9 +11,9 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import services
-from api import schemas
+from api import limits, schemas
 from api.deps import get_current_user
-from core import agent, ai, prompts
+from core import agent, ai, prompts, schema
 from core import skills as skills_registry
 from core import tools as agent_tools
 from core.diff import diff_lines, summarize_changes
@@ -31,6 +31,18 @@ _compile_sem = asyncio.Semaphore(3)
 KEY_API = "anthropic_api_key"
 KEY_MODEL = "default_model"
 KEY_AI_ENABLED = "ai_enabled"
+
+
+def _QUOTA_DETAIL(count: int) -> dict:
+    return {
+        "error": "version_quota_reached",
+        "count": count,
+        "message": (
+            f"You've reached the {count}-version limit for this account. History is "
+            "never deleted automatically — remove versions you no longer need, or "
+            "reach out to raise the cap."
+        ),
+    }
 
 
 def _meta(v: Version) -> schemas.VersionMeta:
@@ -173,6 +185,8 @@ async def create_base(
         row = await services.create_base(session, user.id, body.data, body.label)
     except SchemaError as e:
         raise HTTPException(422, {"problems": e.problems})
+    except services.QuotaExceededError as e:
+        raise HTTPException(403, _QUOTA_DETAIL(e.count))
     return _meta(row)
 
 
@@ -191,6 +205,8 @@ async def create_tailor(
         raise HTTPException(422, {"problems": e.problems})
     except services.NoBaseError:
         raise HTTPException(400, "No base resume yet. Create a base first.")
+    except services.QuotaExceededError as e:
+        raise HTTPException(403, _QUOTA_DETAIL(e.count))
     return _meta(row)
 
 
@@ -245,7 +261,10 @@ async def restore(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    row = await services.restore(session, user.id, v)
+    try:
+        row = await services.restore(session, user.id, v)
+    except services.QuotaExceededError as e:
+        raise HTTPException(403, _QUOTA_DETAIL(e.count))
     if row is None:
         raise HTTPException(404, f"v{v:04d} not found")
     return _meta(row)
@@ -364,6 +383,7 @@ async def chat_send(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
+    limits.chat_rate.hit(user.id, detail="Too many assistant requests. Please slow down.")
     key = await repo.get_config(session, user.id, KEY_API)
     if not key:
         raise HTTPException(400, "No Claude API key or token configured. Add one in Settings.")
@@ -391,6 +411,7 @@ async def chat_continue(
 ):
     """Resolve a confirmed structural action (checkout/restore), then let the agent
     keep going in the same conversation — so a permission prompt doesn't dead-end."""
+    limits.chat_rate.hit(user.id, detail="Too many assistant requests. Please slow down.")
     key = await repo.get_config(session, user.id, KEY_API)
     if not key:
         raise HTTPException(400, "No Claude API key or token configured. Add one in Settings.")
@@ -423,12 +444,21 @@ async def chat_continue(
 
 
 # ── PDF ──────────────────────────────────────────────────────────────────────
-async def _compile(data: dict) -> bytes:
-    async with _compile_sem:
-        try:
-            return await run_in_threadpool(compile_pdf_bytes, data)
-        except CompileError as e:
-            raise HTTPException(422, {"error": str(e), "log": e.log_tail})
+async def _compile(data: dict, user_id: int) -> bytes:
+    # Per-user rate limit + one in-flight compile per user (so a single user
+    # can't monopolize the global pdflatex slots), then the global cap.
+    limits.compile_rate.hit(
+        user_id, detail="Too many PDF compiles. Please wait a moment and retry."
+    )
+    lock = limits.user_compile_lock(user_id)
+    if lock.locked():
+        raise HTTPException(429, "A PDF compile is already in progress. Please wait.")
+    async with lock:
+        async with _compile_sem:
+            try:
+                return await run_in_threadpool(compile_pdf_bytes, data)
+            except CompileError as e:
+                raise HTTPException(422, {"error": str(e), "log": e.log_tail})
 
 
 def _pdf_response(pdf: bytes, filename: str) -> Response:
@@ -448,7 +478,7 @@ async def version_pdf(
     row = await repo.get_version(session, user.id, v)
     if row is None:
         raise HTTPException(404, f"v{v:04d} not found")
-    pdf = await _compile(row.data)
+    pdf = await _compile(row.data, user.id)
     return _pdf_response(pdf, compute_archive_name(row.data, v))
 
 
@@ -465,7 +495,7 @@ async def preview_pdf(
     data = body.data
     if not isinstance(data, dict) or not isinstance(data.get("personal"), dict):
         raise HTTPException(422, {"error": "resume must have a 'personal' object"})
-    pdf = await _compile(data)
+    pdf = await _compile(data, user.id)
     return _pdf_response(pdf, "preview.pdf")
 
 
@@ -478,7 +508,7 @@ async def current_pdf(
     if cur is None:
         raise HTTPException(404, "No current version")
     row = await repo.get_version(session, user.id, cur)
-    pdf = await _compile(row.data)
+    pdf = await _compile(row.data, user.id)
     return _pdf_response(pdf, compute_archive_name(row.data, cur))
 
 
@@ -503,3 +533,57 @@ async def prompt_session(
         raise HTTPException(400, "No base resume yet.")
     baseline = (await repo.get_version(session, user.id, base)).data
     return {"prompt": prompts.build_session_prompt(baseline)}
+
+
+@router.post("/prompts/copy")
+async def prompt_copy(
+    body: schemas.CopyPromptIn,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Full, ready-to-paste prompt for one keyless intent (JD/note injected)."""
+    if body.intent not in prompts.COPY_INTENTS:
+        raise HTTPException(422, f"unknown intent {body.intent!r}")
+    base = await repo.latest_base_version(session, user.id)
+    if base is None:
+        raise HTTPException(400, "No base resume yet.")
+    baseline = (await repo.get_version(session, user.id, base)).data
+    return {
+        "prompt": prompts.build_oneshot_prompt(
+            baseline, body.intent, jd_text=body.jd_text, note=body.note
+        )
+    }
+
+
+@router.post("/paste/preview", response_model=schemas.PastePreviewOut)
+async def paste_preview(
+    body: schemas.PastePreviewIn,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Turn a pasted Claude reply into a reviewable diff.
+
+    Fence-strips + schema-validates the JSON and diffs it against the current
+    baseline (empty if none yet, e.g. the keyless onboarding bootstrap). The
+    caller commits the returned ``data`` via ``/api/base`` or ``/api/tailor``.
+    """
+    from core.schema import SchemaError
+    try:
+        data = ai.extract_json(body.text)
+    except ai.AIError as e:
+        raise HTTPException(422, {"error": str(e), "raw": e.raw})
+    try:
+        data = schema.validate(data)  # returns data normalized to the section model
+    except SchemaError as e:
+        raise HTTPException(422, {"problems": e.problems})
+
+    base = await repo.latest_base_version(session, user.id)
+    baseline = (
+        (await repo.get_version(session, user.id, base)).data
+        if base is not None else {"personal": {}, "sections": []}
+    )
+    return schemas.PastePreviewOut(
+        data=data,
+        diff=diff_lines(baseline, data),
+        summary=summarize_changes(baseline, data),
+    )

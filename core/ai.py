@@ -3,6 +3,11 @@
 Reuses the exact ``SESSION_PROMPT_TEMPLATE`` (with the baseline injected) as the
 system prompt and sends a ``[TAILOR]`` turn, mirroring the copy-paste flow. The
 anthropic SDK is imported lazily so the app runs fine without a key/package.
+
+Both credential kinds work (auto-detected from the prefix), matching
+``core.agent``: a normal API key (``sk-ant-api…``) or a Claude Code OAuth token
+(``sk-ant-oat…``, Bearer auth + the ``oauth-2025-04-20`` beta and the Claude Code
+identity as the first system block).
 """
 
 from __future__ import annotations
@@ -11,6 +16,7 @@ import json
 import re
 
 from core import schema
+from core.agent import CLAUDE_CODE_IDENTITY, OAUTH_BETA, is_oauth_token
 from core.prompts import build_session_prompt
 
 DEFAULT_MODEL = "claude-sonnet-5"
@@ -27,7 +33,12 @@ class AIError(Exception):
         self.raw = raw
 
 
-def _extract_json(text: str) -> dict:
+def extract_json(text: str) -> dict:
+    """Parse a résumé JSON object out of model text.
+
+    Tolerates markdown fences and leading/trailing prose (a pasted Claude reply
+    often has both). Raises :class:`AIError` if no JSON object is present.
+    """
     stripped = _FENCE_RE.sub("", text.strip())
     # If there's leading/trailing prose, grab the outermost object.
     start, end = stripped.find("{"), stripped.rfind("}")
@@ -39,17 +50,33 @@ def _extract_json(text: str) -> dict:
         raise AIError(f"Could not parse model JSON: {exc}", raw=text) from exc
 
 
+# Back-compat private alias (used internally below).
+_extract_json = extract_json
+
+
 def tailor_with_claude(
-    baseline: dict, jd_text: str, api_key: str, model: str | None = None
+    baseline: dict, jd_text: str, credential: str, model: str | None = None
 ) -> dict:
-    """Return a schema-valid tailored resume dict, or raise :class:`AIError`."""
+    """Return a schema-valid tailored resume dict, or raise :class:`AIError`.
+
+    ``credential`` is a Claude API key or a Claude Code OAuth token (auto-detected).
+    """
     try:
         import anthropic
     except ImportError as exc:  # pragma: no cover
         raise AIError("anthropic SDK not installed on the server.") from exc
 
-    client = anthropic.Anthropic(api_key=api_key)
-    system = build_session_prompt(baseline)
+    credential = credential.strip()
+    oauth = is_oauth_token(credential)
+    system = ([{"type": "text", "text": CLAUDE_CODE_IDENTITY}] if oauth else []) + [
+        {"type": "text", "text": build_session_prompt(baseline)}
+    ]
+    if oauth:
+        client = anthropic.Anthropic(
+            auth_token=credential, default_headers={"anthropic-beta": OAUTH_BETA}
+        )
+    else:
+        client = anthropic.Anthropic(api_key=credential)
     try:
         resp = client.messages.create(
             model=model or DEFAULT_MODEL,
