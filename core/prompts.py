@@ -341,12 +341,31 @@ Rules for acting well:
 """
 
 
+CONCISE_STYLE = """\
+
+─────────────────────────
+RESPONSE STYLE — KEEP IT SHORT (this overrides any verbosity elsewhere)
+
+You are in a small chat panel. Be brief and direct:
+- Default to 1–3 sentences. Lead with the answer; skip preamble and don't restate the
+  question or recap what you're about to do.
+- No long caveat lists or hedging. One caveat max, only if it really matters.
+- When you propose a change, ONE short sentence on what you changed — the user sees the
+  diff, so don't describe it in prose.
+- For an ATS audit, use a few terse bullets (hits / gaps / top 2–3 fixes), not paragraphs.
+- Don't ask a pile of clarifying questions; make a reasonable choice and note the one
+  thing you assumed. Only ask if you genuinely can't proceed.
+Short and useful beats thorough and long. Every time.
+─────────────────────────
+"""
+
+
 def build_chat_system(baseline: dict, skill_instructions: str | None) -> str:
-    """Shared advisor preamble + git-tools context + (skill instructions or advisor default)."""
+    """Shared advisor preamble + git-tools context + brevity + (skill instructions or default)."""
     base = build_session_prompt(baseline)  # reuse identity + ATS knowledge + baseline
     focus = skill_instructions or (
         "\nYou are in free-chat advisor mode. Answer questions, read history to ground "
         "yourself, and offer to tailor, update the baseline, audit (ATS), checkout, or "
         "restore when useful."
     )
-    return base + GIT_TOOLS_CONTEXT + "\n" + focus
+    return base + GIT_TOOLS_CONTEXT + CONCISE_STYLE + "\n" + focus
