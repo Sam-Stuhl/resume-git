@@ -22,6 +22,10 @@ async def get_user(session: AsyncSession, email: str) -> User | None:
     ).scalar_one_or_none()
 
 
+async def get_user_by_id(session: AsyncSession, user_id: int) -> User | None:
+    return await session.get(User, user_id)
+
+
 async def create_user(session: AsyncSession, email: str) -> User:
     user = User(email=email.strip().lower())
     session.add(user)
