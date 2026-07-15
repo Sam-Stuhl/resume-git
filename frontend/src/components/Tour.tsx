@@ -3,7 +3,9 @@ import { createPortal } from "react-dom";
 import { prefs } from "../lib/prefs";
 
 /** One coach-mark: a CSS selector to spotlight plus the copy to show. */
-type Step = { selector: string; title: string; body: string };
+/** A coach-mark. `openWith` is clicked to reveal the target if it isn't on
+ * screen yet (e.g. open the assistant panel before highlighting its controls). */
+type Step = { selector: string; title: string; body: string; openWith?: string };
 
 const STEPS: Step[] = [
   {
@@ -34,7 +36,19 @@ const STEPS: Step[] = [
   {
     selector: ".wb-chat-toggle",
     title: "The Resume Assistant",
-    body: "Ask the AI to tailor, audit (ATS), or update your résumé. No key connected? A copy-paste assistant works with any AI chat.",
+    body: "Open it to work on your résumé with AI: tailor it, run an ATS audit, ask for advice, or update your baseline.",
+  },
+  {
+    selector: ".asst-modes",
+    openWith: ".wb-chat-toggle",
+    title: "Two ways to get help",
+    body: "In-app streams answers and applies changes for you (needs a Claude key). Copy-paste works with any AI chat, with no key.",
+  },
+  {
+    selector: ".asst-modes",
+    openWith: ".wb-chat-toggle",
+    title: "Set up a chat (no key)",
+    body: "In Copy-paste, one prompt loads your résumé into any AI chat so it has your résumé as context. Ask follow-ups, iterate, then paste updated JSON back to apply it.",
   },
 ];
 
@@ -54,12 +68,24 @@ export function Tour({ onClose }: { onClose: () => void }) {
   const next = () => (i < STEPS.length - 1 ? setI(i + 1) : finish());
   const back = () => setI((n) => Math.max(0, n - 1));
 
-  // Track the target's position (and follow resize / scroll).
+  // Track the target's position (and follow resize / scroll). If the target
+  // isn't on screen and the step has an `openWith`, click it to reveal it.
   useEffect(() => {
     let raf = 0;
+    let opened = false;
     const measure = () => {
       const el = document.querySelector(step.selector);
-      setRect(el ? el.getBoundingClientRect() : null);
+      const r = el ? el.getBoundingClientRect() : null;
+      const shown = !!r && r.width > 0 && r.height > 0;
+      // The target may exist but be hidden (e.g. the collapsed assistant column).
+      // If so, click `openWith` to reveal it, then re-measure.
+      if (!shown && step.openWith && !opened) {
+        opened = true;
+        (document.querySelector(step.openWith) as HTMLElement | null)?.click();
+        setTimeout(measure, 160);
+        return;
+      }
+      setRect(shown ? r : null);
     };
     measure();
     const onMove = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(measure); };
@@ -70,7 +96,7 @@ export function Tour({ onClose }: { onClose: () => void }) {
       window.removeEventListener("resize", onMove);
       window.removeEventListener("scroll", onMove, true);
     };
-  }, [step.selector]);
+  }, [step.selector, step.openWith]);
 
   // Place the popover once we know its measured height. Beside tall targets,
   // above/below short ones, always clamped into the viewport.
