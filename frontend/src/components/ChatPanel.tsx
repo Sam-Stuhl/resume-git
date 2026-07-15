@@ -7,6 +7,7 @@ import { mergeProposal } from "../lib/proposal";
 import { slugify } from "../lib/git";
 import { GitBranchIcon } from "./icons";
 import { DiffLines, Summary } from "./DiffView";
+import { CopyPasteAssistant } from "./CopyPasteAssistant";
 
 /** A turn is an ordered list of blocks in the order they streamed — text, read
  * steps, structural actions, and proposals interleave sequentially (like Claude),
@@ -193,14 +194,13 @@ export function ChatPanel({
   };
 
   if (!me.ai_enabled) {
+    // No credential: the copy-paste assistant is the first-class keyless path.
     return (
-      <div className="chatpanel">
-        <div className="chat-head"><span className="chat-title">Assistant</span></div>
-        <div className="chat-empty">
-          <p>Connect a Claude API key or Claude Code token to start.</p>
-          <button className="accent" onClick={onOpenSettings}>Open Settings</button>
-        </div>
-      </div>
+      <CopyPasteAssistant
+        onApply={onApply}
+        onCreateBranch={onCreateBranch}
+        onOpenSettings={onOpenSettings}
+      />
     );
   }
 

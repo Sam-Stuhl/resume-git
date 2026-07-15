@@ -111,6 +111,16 @@ export const api = {
   diff: (a: number, b: number) => req<DiffOut>(`/api/versions/${a}/diff/${b}`),
 
   sessionPrompt: () => req<{ prompt: string }>("/api/prompts/session"),
+  onboardingPrompt: () => req<{ prompt: string }>("/api/prompts/onboarding"),
+  // Full, ready-to-paste prompt for one keyless intent (JD/note injected).
+  copyPrompt: (body: { intent: string; jd_text?: string; note?: string }) =>
+    req<{ prompt: string }>("/api/prompts/copy", { method: "POST", body: JSON.stringify(body) }),
+  // Turn a pasted Claude reply into a reviewable diff (fence-strip + validate).
+  pastePreview: (text: string, intent: string) =>
+    req<TailorPreview>("/api/paste/preview", {
+      method: "POST",
+      body: JSON.stringify({ text, intent }),
+    }),
 
   skills: () => req<Skill[]>("/api/skills"),
 

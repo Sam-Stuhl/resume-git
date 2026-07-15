@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 
 ONBOARDING_PROMPT = """\
-You are helping me build a structured JSON representation of my resume that will be used by a local CLI tool. This is a one-time onboarding step.
+You are helping me build a structured JSON representation of my resume that will be used by resume-git, a résumé version-control app. This is a one-time onboarding step.
 
 I will paste my existing resume below (as plain text, a copy-paste from a PDF, or however I have it). Your job is to convert it into the exact JSON schema specified below, then return ONLY that JSON. No explanation, no commentary, no markdown code fences. Start your response with `{` and end with `}`.
 
@@ -59,7 +59,7 @@ CONVERSION RULES (informed by 2026 ATS and AI screener behavior):
 
 5. **Character cleanup.** Replace em-dashes with semicolons or hyphens. Replace arrows with the word 'to'. Use straight quotes only. Avoid characters that might trip a LaTeX compiler or ATS parser.
 
-6. **Empty sections.** If a section is missing in the source, return that key with an empty array. Do not omit top-level keys — the CLI tool requires the full schema.
+6. **Empty sections.** If a section is missing in the source, return that key with an empty array. Do not omit top-level keys — resume-git requires the full schema.
 
 7. **Skills categorization.** Group skills into the four categories shown. If the source lists skills in one block, split them by type. Include the exact technology names as they appear in the source. Omit a category key only if there is nothing to put in it.
 
@@ -157,7 +157,7 @@ You may NOT:
 - Add metrics or numbers that aren't in the baseline
 - Stuff keywords repetitively across many bullets (penalized as keyword stuffing)
 
-**Output format for [TAILOR]:** JSON only, starting with `{` and ending with `}`. No preamble, no markdown code fences, no commentary. The output is fed directly into a CLI that will reject anything else.
+**Output format for [TAILOR]:** JSON only, starting with `{` and ending with `}`. No preamble, no markdown code fences, no commentary. I paste this JSON straight back into resume-git, which will reject anything else.
 
 ═══════════════════════════════════════════════════════════════
 BASE UPDATE MODE — thoughtful, with honest pushback and active trimming
@@ -189,7 +189,7 @@ This means:
 
 **Output format for [BASE UPDATE]:**
 - If clarification, pushback, or trimming discussion is needed: respond in plain English (no JSON yet)
-- When ready to commit: respond with JSON only, starting with `{` and ending with `}`. No preamble, no markdown code fences, no commentary. This is what gets fed into the CLI.
+- When ready to commit: respond with JSON only, starting with `{` and ending with `}`. No preamble, no markdown code fences, no commentary. This is what I paste back into resume-git.
 
 After I confirm a base update, treat the new JSON as my baseline for subsequent requests in this chat.
 
@@ -250,7 +250,7 @@ For a tailored resume:
 (paste the job description here, including company, role title, requirements, and nice-to-haves)
 ─────────────────────────
 
-Claude replies with JSON only. Copy it, return to the CLI, and use 't'.
+Claude replies with JSON only. Copy it and paste it back into resume-git to review the diff and create the branch.
 
 
 For a baseline change (add, modify, or remove):
@@ -273,7 +273,7 @@ questions before producing the final JSON if needed. Examples:
 ─────────────────────────
 
 Claude may push back, ask questions, or suggest trims first. Once you agree, Claude sends
-JSON only. Copy it, return to the CLI, and use 'b'.
+JSON only. Copy it and paste it back into resume-git to review the diff and update your baseline.
 
 
 For advice without committing to anything:
@@ -311,6 +311,49 @@ def build_session_prompt(baseline: dict) -> str:
     """Return the session system prompt with the baseline JSON injected."""
     baseline_str = json.dumps(baseline, indent=2, ensure_ascii=False)
     return SESSION_PROMPT_TEMPLATE.replace("__BASELINE_JSON__", baseline_str)
+
+
+# The four copy-paste intents and the turn tag each maps to.
+COPY_INTENTS = {
+    "tailor": "TAILOR",
+    "base-update": "BASE UPDATE",
+    "ask": "ASK",
+    "ats": "ATS",
+}
+
+
+def build_oneshot_prompt(
+    baseline: dict, intent: str, *, jd_text: str | None = None, note: str | None = None
+) -> str:
+    """One self-contained block a keyless user pastes into a fresh Claude.ai chat.
+
+    It carries the full advisor system prompt (identity, ATS knowledge, baseline)
+    *and* the concrete request, so the user copies once and gets a direct answer —
+    no manual re-assembly of a ``[TAG]`` turn. The trailing directive overrides the
+    template's "reply only with Ready" acknowledgement so the model acts immediately.
+    """
+    tag = COPY_INTENTS.get(intent)
+    if tag is None:
+        raise ValueError(f"unknown copy-paste intent: {intent!r}")
+
+    body = (jd_text or note or "").strip()
+    turn = f"[{tag}]" + (f"\n\n{body}" if body else "")
+    returns_json = intent in ("tailor", "base-update")
+    closing = (
+        "Return ONLY the JSON for the updated résumé (start with `{`, end with `}`) so "
+        "I can paste it straight back into resume-git."
+        if returns_json
+        else "Reply in plain English — no JSON for this request."
+    )
+    return (
+        build_session_prompt(baseline)
+        + "\n\n═══════════════════════════════════════════════════════════════\n"
+        + "MY REQUEST (skip the 'Ready' acknowledgement and answer this now)\n"
+        + "═══════════════════════════════════════════════════════════════\n\n"
+        + turn
+        + "\n\n"
+        + closing
+    )
 
 
 # Appended to the session prompt when Claude runs as the interactive, git-aware

@@ -15,15 +15,30 @@ CURRENT_KEY = "current_version"
 
 
 # ── Users ───────────────────────────────────────────────────────────────────
-async def get_or_create_user(session: AsyncSession, email: str) -> User:
+async def get_user(session: AsyncSession, email: str) -> User | None:
     email = email.strip().lower()
-    user = (
+    return (
         await session.execute(select(User).where(User.email == email))
     ).scalar_one_or_none()
+
+
+async def create_user(session: AsyncSession, email: str) -> User:
+    user = User(email=email.strip().lower())
+    session.add(user)
+    await session.flush()
+    return user
+
+
+async def count_users(session: AsyncSession) -> int:
+    return (
+        await session.execute(select(func.count()).select_from(User))
+    ).scalar_one()
+
+
+async def get_or_create_user(session: AsyncSession, email: str) -> User:
+    user = await get_user(session, email)
     if user is None:
-        user = User(email=email)
-        session.add(user)
-        await session.flush()
+        user = await create_user(session, email)
     return user
 
 
@@ -67,6 +82,14 @@ async def next_version(session: AsyncSession, user_id: int) -> int:
         )
     ).scalar_one()
     return (row or 0) + 1
+
+
+async def count_versions(session: AsyncSession, user_id: int) -> int:
+    return (
+        await session.execute(
+            select(func.count()).select_from(Version).where(Version.user_id == user_id)
+        )
+    ).scalar_one()
 
 
 async def latest_base_version(session: AsyncSession, user_id: int) -> int | None:

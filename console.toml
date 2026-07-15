@@ -4,13 +4,14 @@
 # Runtime secrets, by NAME only (values live in the console, never in git):
 #   DATABASE_URL   Neon Postgres connection string (REQUIRED)
 #
-# Cloudflare Access already gates this app and injects the authenticated-email
-# header (the console sets up the Access application + allowlist), so the app
-# needs nothing for auth. The two CF_ACCESS_* vars below are OPTIONAL and only
-# enable an extra JWT-signature check; add them as secrets only if you want that
-# hardening:
+# Cloudflare Access gates this app and injects the authenticated-email header.
+# For OPEN self-serve signup, set the Access policy to "allow any Google account"
+# (instead of a manual email allowlist). When the door is open, harden the app:
 #   CF_ACCESS_TEAM_DOMAIN    e.g. https://yourteam.cloudflareaccess.com
 #   CF_ACCESS_AUD            the Access application's AUD tag
+#   REQUIRE_ACCESS_JWT=1     fail closed — reject any request without a verified
+#                            Access token (needs the two CF_ACCESS_* above)
+# And bound resource use (see [env] below). DEV_USER_EMAIL must NEVER be set here.
 secrets = ["DATABASE_URL"]
 
 [app]
@@ -29,3 +30,10 @@ cpus = 1.0
 [env]
 # Non-secret runtime config.
 # DEFAULT_MODEL = "claude-sonnet-5"
+#
+# Open-signup guardrails (all optional; unset = unlimited / off):
+# REQUIRE_ACCESS_JWT = "1"        # fail-closed auth; strongly recommended when public
+# MAX_USERS = "50"                # cap distinct accounts (protects the Neon free tier)
+# MAX_VERSIONS_PER_USER = "200"   # per-user version cap; commits rejected at the cap
+# COMPILE_RATE_PER_MIN = "30"     # per-user PDF-compile budget
+# CHAT_RATE_PER_MIN = "30"        # per-user assistant-request budget
