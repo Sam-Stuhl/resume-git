@@ -9,10 +9,11 @@ import { Compare } from "./components/Compare";
 import { NetworkGraph } from "./components/NetworkGraph";
 import { CommitModal } from "./components/CommitModal";
 import { Settings } from "./components/Settings";
-import { ImportPanel } from "./components/ImportPanel";
 import { OnboardingWizard } from "./components/OnboardingWizard";
+import { UserMenu } from "./components/UserMenu";
 import { GitBranchIcon, MenuIcon } from "./components/icons";
 import { branchName, ref } from "./lib/git";
+import { prefs } from "./lib/prefs";
 
 type View = "edit" | "compare" | "network" | "pdf" | "settings" | "tailor";
 const TABS: { id: View; label: string }[] = [
@@ -49,7 +50,7 @@ export default function App() {
   const [current, setCurrent] = useState<number | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [detail, setDetail] = useState<VersionDetail | null>(null);
-  const [view, setView] = useState<View>("edit");
+  const [view, setView] = useState<View>(() => prefs.landingTab());
   const [modalVersion, setModalVersion] = useState<number | null>(null);
   const [railOpen, setRailOpen] = useState<boolean>(() => {
     const s = localStorage.getItem("railOpen");
@@ -90,6 +91,12 @@ export default function App() {
     api.version(selected).then(setDetail).catch(() => setDetail(null));
   }, [selected]);
 
+  // A brand-new empty account must land on the onboarding wizard (Edit view),
+  // regardless of the saved default-landing-tab preference.
+  useEffect(() => {
+    if (versions.length === 0 && !wizardDismissed) setView("edit");
+  }, [versions.length, wizardDismissed]);
+
   const onCommitted = async (v?: number) => {
     await refresh(v);
     setMe(await api.me());
@@ -124,6 +131,7 @@ export default function App() {
         <button className="accent branch-btn" onClick={() => setView("tailor")} disabled={empty}>
           <GitBranchIcon size={14} /> <span className="nb-text">New branch</span>
         </button>
+        {me && <UserMenu me={me} onOpenSettings={() => setView("settings")} />}
       </div>
 
       <div className="layout">
@@ -188,10 +196,13 @@ export default function App() {
                 <Compare versions={versions} selected={selected} />
               )}
               {view === "settings" && me && (
-                <>
-                  <Settings me={me} theme={theme} setTheme={setTheme} onChange={async () => setMe(await api.me())} />
-                  <ImportPanel onImported={() => refresh()} />
-                </>
+                <Settings
+                  me={me}
+                  theme={theme}
+                  setTheme={setTheme}
+                  onChange={async () => setMe(await api.me())}
+                  onImported={() => refresh()}
+                />
               )}
             </div>
           )}
