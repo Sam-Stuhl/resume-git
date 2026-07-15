@@ -302,48 +302,35 @@ async def chat_clear(
     return {"ok": True}
 
 
-@router.post("/chat/{thread_key}")
-async def chat_send(
-    thread_key: str,
-    body: schemas.ChatSendIn,
-    user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
-):
-    key = await repo.get_config(session, user.id, KEY_API)
-    if not key:
-        raise HTTPException(400, "No Claude API key or token configured. Add one in Settings.")
+_SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"}
 
-    base = await repo.latest_base_version(session, user.id)
+
+async def _agent_context(session: AsyncSession, user_id: int) -> tuple[dict, dict | None]:
+    """Baseline resume + current HEAD (version/branch) for the agent's context.
+
+    HEAD matters because confirmed checkouts aren't recorded in the chat thread, so
+    without it the model can misjudge state from stale history.
+    """
+    base = await repo.latest_base_version(session, user_id)
     baseline = (
-        (await repo.get_version(session, user.id, base)).data
+        (await repo.get_version(session, user_id, base)).data
         if base is not None else {"personal": {}, "sections": []}
     )
-    model = body.model or await repo.get_config(session, user.id, KEY_MODEL)
-
-    # Tell the agent where HEAD actually is — confirmed checkouts aren't recorded in
-    # the chat thread, so without this the model can misjudge state from stale history.
-    cur = await repo.current_version(session, user.id)
+    cur = await repo.current_version(session, user_id)
     head = None
     if cur is not None:
-        cur_row = await repo.get_version(session, user.id, cur)
-        if cur_row is not None:
+        row = await repo.get_version(session, user_id, cur)
+        if row is not None:
             head = {
-                "version": cur_row.version,
-                "branch": agent_tools.branch_of(cur_row.label, cur_row.is_base),
-                "is_base": cur_row.is_base,
+                "version": row.version,
+                "branch": agent_tools.branch_of(row.label, row.is_base),
+                "is_base": row.is_base,
             }
+    return baseline, head
 
-    # Replay only prior *text* turns as history (proposals are UI-only, never
-    # replayed as tool calls — keeps the Messages API history simple and valid).
-    prior = await repo.list_messages(session, user.id, thread_key)
-    history = [{"role": m.role, "content": m.content} for m in prior if m.content]
 
-    # Persist the user's message before streaming (committed on the request session).
-    await repo.add_message(session, user.id, thread_key, "user", body.message)
-    await session.commit()
-
-    uid = user.id
-
+def _agent_stream(*, thread_key, uid, key, model, baseline, head, history, user_message, current_data, skill=None):
+    """Run one agent turn as SSE and persist the assistant message. Shared by send + continue."""
     async def gen():
         parts: list[str] = []
         proposal = None
@@ -353,8 +340,8 @@ async def chat_send(
                 return await agent_tools.dispatch_read(s2, uid, name, args)
             async for kind, payload in agent.stream_chat(
                 credential=key, model=model, baseline=baseline, history=history,
-                user_message=body.message, current_data=body.current_data,
-                skill=body.skill, head=head, read_dispatch=read_dispatch,
+                user_message=user_message, current_data=current_data,
+                skill=skill, head=head, read_dispatch=read_dispatch,
             ):
                 if kind == "delta":
                     parts.append(payload)
@@ -367,14 +354,71 @@ async def chat_send(
                                    proposal=proposal or ({"actions": actions} if actions else None))
             await s2.commit()
 
-    return StreamingResponse(
-        gen(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",
-            "Connection": "keep-alive",
-        },
+    return StreamingResponse(gen(), media_type="text/event-stream", headers=_SSE_HEADERS)
+
+
+@router.post("/chat/{thread_key}")
+async def chat_send(
+    thread_key: str,
+    body: schemas.ChatSendIn,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    key = await repo.get_config(session, user.id, KEY_API)
+    if not key:
+        raise HTTPException(400, "No Claude API key or token configured. Add one in Settings.")
+    baseline, head = await _agent_context(session, user.id)
+    model = body.model or await repo.get_config(session, user.id, KEY_MODEL)
+    # Replay only prior *text* turns as history (tool round-trips are ephemeral).
+    prior = await repo.list_messages(session, user.id, thread_key)
+    history = [{"role": m.role, "content": m.content} for m in prior if m.content]
+    # Persist the user's message before streaming (committed on the request session).
+    await repo.add_message(session, user.id, thread_key, "user", body.message)
+    await session.commit()
+    return _agent_stream(
+        thread_key=thread_key, uid=user.id, key=key, model=model, baseline=baseline,
+        head=head, history=history, user_message=body.message,
+        current_data=body.current_data, skill=body.skill,
+    )
+
+
+@router.post("/chat/{thread_key}/continue")
+async def chat_continue(
+    thread_key: str,
+    body: schemas.ChatContinueIn,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Resolve a confirmed structural action (checkout/restore), then let the agent
+    keep going in the same conversation — so a permission prompt doesn't dead-end."""
+    key = await repo.get_config(session, user.id, KEY_API)
+    if not key:
+        raise HTTPException(400, "No Claude API key or token configured. Add one in Settings.")
+
+    outcome = f"The user declined the {body.tool}."
+    if body.approved:
+        v = int(body.args.get("version", 0))
+        if body.tool == "checkout":
+            ok = await services.set_current(session, user.id, v)
+            outcome = f"Checkout done — HEAD is now v{v:04d}." if ok else f"Checkout failed — v{v:04d} not found."
+        elif body.tool == "restore":
+            row = await services.restore(session, user.id, v)
+            outcome = (f"Restored v{v:04d} as new commit v{row.version:04d}." if row
+                       else f"Restore failed — v{v:04d} not found.")
+        else:
+            outcome = f"Unknown action '{body.tool}'."
+        await session.commit()
+
+    baseline, head = await _agent_context(session, user.id)
+    model = body.model or await repo.get_config(session, user.id, KEY_MODEL)
+    prior = await repo.list_messages(session, user.id, thread_key)
+    history = [{"role": m.role, "content": m.content} for m in prior if m.content]
+    # Ephemeral context (not persisted as a user turn) — the outcome + a nudge to continue.
+    note = (f"(System note, not from the user: {outcome}) Acknowledge in one short line and "
+            "continue helping. Do NOT call that same action again.")
+    return _agent_stream(
+        thread_key=thread_key, uid=user.id, key=key, model=model, baseline=baseline,
+        head=head, history=history, user_message=note, current_data=body.current_data,
     )
 
 

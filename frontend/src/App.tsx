@@ -88,7 +88,7 @@ export default function App() {
     api.version(selected).then(setDetail).catch(() => setDetail(null));
   }, [selected]);
 
-  const onCommitted = async (v: number) => {
+  const onCommitted = async (v?: number) => {
     await refresh(v);
     setMe(await api.me());
   };

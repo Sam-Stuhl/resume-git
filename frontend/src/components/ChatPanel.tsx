@@ -81,39 +81,27 @@ export function ChatPanel({
     return m && skills.some((s) => s.name === m[1]) ? m[1] : undefined;
   }
 
-  async function send() {
-    const text = input.trim();
-    if (!text || streaming) return;
-    const skill = detectSkill(text);
-    setInput("");
-    setErr("");
-    const userMsg: Msg = {
-      id: -Date.now(), role: "user", content: text, proposal: null, created_at: "",
-    };
-    setMessages((m) => [...m, userMsg]);
+  // Run one streamed assistant turn: manage live state, then finalize the message.
+  async function runTurn(
+    start: (h: import("../api").ChatStreamHandlers) => Promise<void>,
+    afterDone?: () => void,
+  ) {
     setStreaming(true);
-    setLiveText("");
-    setLiveProposal(null);
-    setLiveSteps([]);
-    setLiveActions([]);
-
+    setErr("");
+    setLiveText(""); setLiveProposal(null); setLiveSteps([]); setLiveActions([]);
     let text_ = "";
     let proposal: ChatProposal | null = null;
     const steps: ToolStep[] = [];
     const actions: AgentAction[] = [];
     try {
-      await api.chatStream(
-        threadKey,
-        { message: text, model: me.default_model, current_data: currentData, skill },
-        {
-          onDelta: (d) => { text_ += d; setLiveText(text_); },
-          onProposal: (p) => { proposal = p; setLiveProposal(p); },
-          onToolStep: (s) => { steps.push(s); setLiveSteps((v) => [...v, s]); },
-          onAction: (a) => { actions.push(a); setLiveActions((v) => [...v, a]); },
-          onError: (msg) => setErr(msg),
-          onDone: () => { /* finalized below */ },
-        }
-      );
+      await start({
+        onDelta: (d) => { text_ += d; setLiveText(text_); },
+        onProposal: (p) => { proposal = p; setLiveProposal(p); },
+        onToolStep: (s) => { steps.push(s); setLiveSteps((v) => [...v, s]); },
+        onAction: (a) => { actions.push(a); setLiveActions((v) => [...v, a]); },
+        onError: (msg) => setErr(msg),
+        onDone: () => { /* finalized below */ },
+      });
     } catch (e) {
       setErr(String((e as ApiError).message || e));
     } finally {
@@ -125,12 +113,34 @@ export function ChatPanel({
           actions: actions.length ? actions : undefined,
         },
       ]);
-      setLiveText("");
-      setLiveProposal(null);
-      setLiveSteps([]);
-      setLiveActions([]);
+      setLiveText(""); setLiveProposal(null); setLiveSteps([]); setLiveActions([]);
       setStreaming(false);
+      afterDone?.();
     }
+  }
+
+  async function send() {
+    const text = input.trim();
+    if (!text || streaming) return;
+    const skill = detectSkill(text);
+    setInput("");
+    setMessages((m) => [...m, { id: -Date.now(), role: "user", content: text, proposal: null, created_at: "" }]);
+    await runTurn((h) =>
+      api.chatStream(threadKey, { message: text, model: me.default_model, current_data: currentData, skill }, h)
+    );
+  }
+
+  // Approve/decline a structural action; the agent executes it and keeps going.
+  async function resolveAction(action: AgentAction, approved: boolean) {
+    if (streaming) return;
+    await runTurn(
+      (h) => api.chatContinue(
+        threadKey,
+        { tool: action.tool, args: action.args, approved, model: me.default_model, current_data: currentData },
+        h,
+      ),
+      () => { if (approved) onRepoChanged(action.tool === "checkout" ? action.args.version : undefined); },
+    );
   }
 
   function jdFor(index: number): string | null {
@@ -180,7 +190,8 @@ export function ChatPanel({
         {messages.map((m, i) => (
           <Bubble key={m.id} role={m.role} text={m.content}>
             {m.steps && m.steps.map((s, si) => (
-              <div key={si} className="tool-step">▸ {s.summary}</div>
+              <div key={si} className="tool-step">
+{s.summary}</div>
             ))}
             {isContentProposal(m.proposal) ? (
               <ProposalCard
@@ -193,18 +204,20 @@ export function ChatPanel({
               />
             ) : (
               persistedActions(m.proposal).map((a, ai) => (
-                <div key={ai} className="tool-step">▸ {a.summary}</div>
+                <div key={ai} className="tool-step">
+{a.summary}</div>
               ))
             )}
             {m.actions && m.actions.map((a, ai) => (
-              <ActionCard key={ai} action={a} onRepoChanged={onRepoChanged} />
+              <ActionCard key={ai} action={a} disabled={streaming} onResolve={resolveAction} />
             ))}
           </Bubble>
         ))}
         {streaming && (
           <Bubble role="assistant" text={liveText || "…"}>
             {liveSteps.map((s, si) => (
-              <div key={si} className="tool-step">▸ {s.summary}</div>
+              <div key={si} className="tool-step">
+{s.summary}</div>
             ))}
             {liveProposal && (
               <ProposalCard
@@ -217,7 +230,7 @@ export function ChatPanel({
               />
             )}
             {liveActions.map((a, ai) => (
-              <ActionCard key={ai} action={a} onRepoChanged={onRepoChanged} />
+              <ActionCard key={ai} action={a} disabled={streaming} onResolve={resolveAction} />
             ))}
           </Bubble>
         )}
@@ -276,40 +289,24 @@ function Bubble({ role, text, children }: { role: string; text: string; children
   );
 }
 
-/** A confirm card for a structural action (checkout/restore) the agent proposed
- * mid-turn. Confirming calls the corresponding API then reports the resulting
- * version upward so the HEAD badge + history rail refresh. */
-function ActionCard({ action, onRepoChanged }: {
+/** Permission prompt for a structural action (checkout/restore). Resolving hands
+ * the decision to the server, which executes it and streams the agent's
+ * continuation — so approving doesn't dead-end the chat. */
+function ActionCard({ action, disabled, onResolve }: {
   action: AgentAction;
-  onRepoChanged: (v?: number) => void;
+  disabled: boolean;
+  onResolve: (action: AgentAction, approved: boolean) => void;
 }) {
-  const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<"" | "done" | "cancelled">("");
 
-  const run = async () => {
-    setBusy(true);
-    try {
-      if (action.tool === "checkout") {
-        await api.setCurrent(action.args.version);
-        onRepoChanged(action.args.version);
-      } else {
-        const r = await api.restore(action.args.version);
-        onRepoChanged(r.version);
-      }
-      setDone("done");
-    } finally {
-      setBusy(false);
-    }
-  };
-
   if (done === "done") return <div className="action-card done">✓ {action.summary}</div>;
-  if (done === "cancelled") return <div className="action-card done">✕ cancelled — {action.summary}</div>;
+  if (done === "cancelled") return <div className="action-card">✕ Cancelled — {action.summary}</div>;
   return (
     <div className="action-card">
       <span>{action.summary}?</span>
       <div className="row">
-        <button className="green" disabled={busy} onClick={run}>Confirm</button>
-        <button disabled={busy} onClick={() => setDone("cancelled")}>Cancel</button>
+        <button className="green" disabled={disabled} onClick={() => { setDone("done"); onResolve(action, true); }}>Confirm</button>
+        <button disabled={disabled} onClick={() => { setDone("cancelled"); onResolve(action, false); }}>Cancel</button>
       </div>
     </div>
   );
