@@ -61,9 +61,9 @@ export function ChatPanel({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages, liveText, liveProposal, liveSteps, liveActions, streaming]);
 
-  // `/` skill menu: while the input starts with "/", filter skills by the text
-  // that follows (up to the first space).
-  const skillQuery = input.startsWith("/") ? input.slice(1).split(/\s/, 1)[0].toLowerCase() : null;
+  // `/` skill menu: show it only while typing the bare /token (no space yet), so it
+  // closes as soon as you pick a skill or start typing your actual message.
+  const skillQuery = /^\/\S*$/.test(input) ? input.slice(1).toLowerCase() : null;
   const filteredSkills = useMemo(() => {
     if (skillQuery === null) return [];
     return skills.filter((s) => s.name.toLowerCase().includes(skillQuery));
