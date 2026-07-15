@@ -241,9 +241,12 @@ export function ChatPanel({
         ))}
         {streaming && (
           <div className="chat-msg assistant">
-            {liveBlocks.length
-              ? liveBlocks.map((b, bi) => renderBlock(b, bi, liveJd))
-              : <div className="chat-bubble">…</div>}
+            {liveBlocks.map((b, bi) => renderBlock(b, bi, liveJd))}
+            {/* Persist a working indicator until the bot actually answers (text) or
+                produces a result (action/proposal) — it stays through read steps. */}
+            {(liveBlocks.length === 0 || liveBlocks[liveBlocks.length - 1].kind === "tool") && (
+              <div className="chat-working">Working…</div>
+            )}
           </div>
         )}
       </div>

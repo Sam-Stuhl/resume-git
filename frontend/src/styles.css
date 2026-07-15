@@ -381,5 +381,8 @@ textarea.raw { width: 100%; min-height: 60vh; }
 .chat-skill-menu .sk-name { font-family: var(--mono); font-size: 13px; color: var(--accent); }
 .chat-skill-menu .sk-desc { color: var(--muted); font-size: 12px; }
 .tool-step { color: var(--muted); font-size: 12px; font-family: var(--mono); padding: 1px 0; }
+.chat-working { color: var(--muted); font-size: 13px; padding: 2px 0; animation: work-pulse 1.3s ease-in-out infinite; }
+@keyframes work-pulse { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .chat-working { animation: none; opacity: .7; } }
 .action-card { border: 1px solid var(--border); border-radius: 12px; padding: 11px 13px; display: flex; flex-direction: column; gap: 9px; background: var(--panel); font-size: 13px; }
 .action-card.done { color: var(--commit); }
