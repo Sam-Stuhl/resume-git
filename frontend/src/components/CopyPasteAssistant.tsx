@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, ApiError } from "../api";
 import type { Resume, TailorPreview } from "../types";
 import { slugify } from "../lib/git";
-import { GitBranchIcon } from "./icons";
+import { prefs } from "../lib/prefs";
+import { ChevronIcon, GitBranchIcon } from "./icons";
 import { DiffLines, Summary } from "./DiffView";
 
 /** The keyless assistant: same four skills as the in-app agent, run through a
@@ -21,11 +22,10 @@ const INTENTS: { id: Intent; label: string; blurb: string; returnsJson: boolean 
 const NEEDS_JD: Intent[] = ["tailor", "ats"];
 
 export function CopyPasteAssistant({
-  onApply, onCreateBranch, onOpenSettings,
+  onApply, onCreateBranch,
 }: {
   onApply: (resume: Resume) => void;
   onCreateBranch: (data: Resume, label: string, jd: string | null) => Promise<void>;
-  onOpenSettings: () => void;
 }) {
   const [intent, setIntent] = useState<Intent>("tailor");
   const [text, setText] = useState("");        // the JD (tailor/ats) or note (ask/base-update)
@@ -36,6 +36,25 @@ export function CopyPasteAssistant({
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [err, setErr] = useState("");
+
+  // The "set up a chat" session prompt: résumé + commands, pasted once to start a
+  // conversation that already has your résumé as context.
+  const [session, setSession] = useState("");
+  const [sessionCopied, setSessionCopied] = useState(false);
+  const [sessionHidden, setSessionHidden] = useState(() => prefs.cpSessionHidden());
+  const toggleSession = () => {
+    setSessionHidden((h) => { prefs.setCpSessionHidden(!h); return !h; });
+  };
+  useEffect(() => {
+    let alive = true;
+    api.sessionPrompt().then((r) => { if (alive) setSession(r.prompt); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  async function copySession() {
+    await navigator.clipboard.writeText(session);
+    setSessionCopied(true);
+    setTimeout(() => setSessionCopied(false), 1500);
+  }
 
   const spec = INTENTS.find((i) => i.id === intent)!;
   const needsJd = NEEDS_JD.includes(intent);
@@ -91,15 +110,36 @@ export function CopyPasteAssistant({
   }
 
   return (
-    <div className="chatpanel cp-assistant">
-      <div className="chat-head"><span className="chat-title">Assistant</span>
-        <span className="chat-thread">copy-paste</span></div>
+    <div className="cp-body">
+      {session && (
+        <div className="card cp-session">
+          <button className="cp-session-head" onClick={toggleSession} aria-expanded={!sessionHidden}>
+            <span className="section-title" style={{ margin: 0 }}>
+              Set up a chat{sessionHidden ? "" : " (recommended)"}
+            </span>
+            <ChevronIcon size={14} className={sessionHidden ? "chev-collapsed" : ""} />
+          </button>
+          {!sessionHidden && (
+            <>
+              <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+                Paste this into a new AI chat once. It loads your résumé and the commands, so the chat
+                has your résumé as context and you can ask follow-ups and iterate without re-pasting.
+                When it hands back updated résumé JSON, apply it below.
+              </p>
+              <button onClick={copySession}>{sessionCopied ? "Copied ✓" : "Copy setup prompt"}</button>
+              <details style={{ marginTop: 8 }}>
+                <summary className="muted" style={{ cursor: "pointer", fontSize: 12 }}>Preview the prompt</summary>
+                <textarea rows={6} readOnly value={session} style={{ marginTop: 8 }} />
+              </details>
+            </>
+          )}
+        </div>
+      )}
 
-      <div className="cp-body">
-        <p className="muted cp-intro">
-          No key connected. Use any AI chat: pick what you want, copy the prompt,
-          and (for changes) paste the reply back to review it.
-        </p>
+      <p className="muted cp-intro">
+        Or copy a one-off request for a single task: pick what you want, copy the prompt, and
+        (for changes) paste the reply back to review it.
+      </p>
 
         <div className="ed-modebar cp-intents">
           {INTENTS.map((i) => (
@@ -196,13 +236,7 @@ export function CopyPasteAssistant({
           </div>
         )}
 
-        {err && <p className="err" style={{ whiteSpace: "pre-wrap" }}>{err}</p>}
-
-        <p className="muted cp-footer">
-          Prefer it in-app? <button className="linklike" onClick={onOpenSettings}>Connect a Claude key</button> to
-          unlock the streaming assistant.
-        </p>
-      </div>
+      {err && <p className="err" style={{ whiteSpace: "pre-wrap" }}>{err}</p>}
     </div>
   );
 }

@@ -4,12 +4,15 @@
 
 export type LandingTab = "edit" | "compare" | "network" | "pdf";
 export type EditorMode = "form" | "raw";
+export type AssistantMode = "agent" | "copypaste";
 
 const KEYS = {
   landingTab: "pref.landingTab",
   editorMode: "pref.editorMode",
   autoCompile: "pref.autoCompile",
   tourSeen: "pref.tourSeen",
+  assistantMode: "pref.assistantMode",
+  cpSessionHidden: "pref.cpSessionHidden",
 } as const;
 
 const LANDING_TABS: LandingTab[] = ["edit", "compare", "network", "pdf"];
@@ -59,5 +62,22 @@ export const prefs = {
   },
   setTourSeen(v: boolean) {
     write(KEYS.tourSeen, v ? "1" : "0");
+  },
+
+  // Last chosen assistant mode. Null means "not chosen yet" (default by key).
+  assistantMode(): AssistantMode | null {
+    const v = read(KEYS.assistantMode);
+    return v === "agent" || v === "copypaste" ? v : null;
+  },
+  setAssistantMode(v: AssistantMode) {
+    write(KEYS.assistantMode, v);
+  },
+
+  // Whether the copy-paste "Set up a chat" section is collapsed.
+  cpSessionHidden(): boolean {
+    return read(KEYS.cpSessionHidden) === "1";
+  },
+  setCpSessionHidden(v: boolean) {
+    write(KEYS.cpSessionHidden, v ? "1" : "0");
   },
 };

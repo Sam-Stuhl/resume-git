@@ -411,8 +411,24 @@ textarea.raw { width: 100%; min-height: 60vh; }
 .onb-list code { font-family: var(--mono); font-size: 12px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
 .onb-back { display: block; margin-top: 16px; font-size: 12px; }
 
+/* Assistant mode toggle (In-app vs Copy-paste) */
+.asst-modes { margin-bottom: 0; }
+.asst-modes .seg { padding: 4px 12px; font-size: 12px; }
+
+/* In-app tab, no credential connected */
+.connect-inapp { flex: 1; min-height: 0; overflow-y: auto; padding: 18px 16px; }
+.ci-lead { font-size: 13px; line-height: 1.6; color: var(--text); max-width: 46ch; margin: 0 0 16px; }
+.connect-inapp code { font-family: var(--mono); font-size: 11px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
+
 /* Copy-paste (keyless) assistant */
 .cp-body { flex: 1; min-height: 0; overflow-y: auto; padding: 16px; }
+.cp-session-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  width: 100%; padding: 0; border: none; background: none; color: var(--text);
+}
+.cp-session-head:hover { border-color: transparent; }
+.cp-session-head .chev-collapsed { transform: rotate(-90deg); }
+.cp-session-head svg { color: var(--muted); flex: none; transition: transform .15s; }
 .cp-intro { font-size: 12.5px; line-height: 1.55; max-width: 46ch; margin-bottom: 14px; }
 .cp-intents { display: flex; margin-bottom: 8px; }
 .cp-blurb { font-size: 12px; line-height: 1.5; margin: 0 0 14px; max-width: 46ch; }

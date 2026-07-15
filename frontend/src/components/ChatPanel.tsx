@@ -5,9 +5,11 @@ import type {
 } from "../types";
 import { mergeProposal } from "../lib/proposal";
 import { slugify } from "../lib/git";
+import { prefs, type AssistantMode } from "../lib/prefs";
 import { GitBranchIcon } from "./icons";
 import { DiffLines, Summary } from "./DiffView";
 import { CopyPasteAssistant } from "./CopyPasteAssistant";
+import { ConnectInApp } from "./ConnectInApp";
 
 /** A turn is an ordered list of blocks in the order they streamed — text, read
  * steps, structural actions, and proposals interleave sequentially (like Claude),
@@ -44,16 +46,23 @@ function suggestedName(p: ChatProposal): string {
  * turn renders in the order it happened.
  */
 export function ChatPanel({
-  threadKey, me, currentData, onApply, onCreateBranch, onOpenSettings, onRepoChanged,
+  threadKey, me, currentData, onApply, onCreateBranch, onRepoChanged, onMeChanged,
 }: {
   threadKey: string;
   me: Me;
   currentData: Resume;
   onApply: (resume: Resume) => void;
   onCreateBranch: (data: Resume, label: string, jd: string | null) => Promise<void>;
-  onOpenSettings: () => void;
   onRepoChanged: (v?: number) => void;
+  onMeChanged: () => void | Promise<void>;
 }) {
+  // Which assistant to show: the streaming in-app agent or the copy-paste flow.
+  // Default by credential the first time, then remember the user's choice.
+  const [mode, setMode] = useState<AssistantMode>(
+    () => prefs.assistantMode() ?? (me.ai_enabled ? "agent" : "copypaste")
+  );
+  const switchMode = (m: AssistantMode) => { setMode(m); prefs.setAssistantMode(m); };
+
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -193,17 +202,6 @@ export function ChatPanel({
     );
   };
 
-  if (!me.ai_enabled) {
-    // No credential: the copy-paste assistant is the first-class keyless path.
-    return (
-      <CopyPasteAssistant
-        onApply={onApply}
-        onCreateBranch={onCreateBranch}
-        onOpenSettings={onOpenSettings}
-      />
-    );
-  }
-
   const liveJd = (() => {
     const lastUser = [...messages].reverse().find((m) => m.role === "user");
     const t = lastUser?.blocks.find((b): b is Extract<Block, { kind: "text" }> => b.kind === "text");
@@ -213,10 +211,12 @@ export function ChatPanel({
   return (
     <div className="chatpanel">
       <div className="chat-head">
-        <span className="chat-title">Assistant</span>
-        <span className="chat-thread">{threadKey}</span>
+        <div className="ed-modebar asst-modes">
+          <button className={"seg" + (mode === "agent" ? " on" : "")} onClick={() => switchMode("agent")}>In-app</button>
+          <button className={"seg" + (mode === "copypaste" ? " on" : "")} onClick={() => switchMode("copypaste")}>Copy-paste</button>
+        </div>
         <span className="spacer" />
-        {messages.length > 0 && (
+        {mode === "agent" && me.ai_enabled && messages.length > 0 && (
           <button
             className="chat-clear"
             title="Clear this conversation"
@@ -228,57 +228,65 @@ export function ChatPanel({
         )}
       </div>
 
-      <div className="chat-msgs" ref={scrollRef}>
-        {messages.length === 0 && !streaming && (
-          <p className="chat-hint">
-            Ask anything about your resume — or type <kbd>/</kbd> for a skill.
-          </p>
-        )}
-        {messages.map((m, i) => (
-          <div key={m.id} className={"chat-msg " + m.role}>
-            {m.blocks.map((b, bi) => renderBlock(b, bi, jdFor(i)))}
-          </div>
-        ))}
-        {streaming && (
-          <div className="chat-msg assistant">
-            {liveBlocks.map((b, bi) => renderBlock(b, bi, liveJd))}
-            {/* Persist a working indicator until the bot actually answers (text) or
-                produces a result (action/proposal) — it stays through read steps. */}
-            {(liveBlocks.length === 0 || liveBlocks[liveBlocks.length - 1].kind === "tool") && (
-              <div className="chat-working">Working…</div>
+      {mode === "copypaste" ? (
+        <CopyPasteAssistant onApply={onApply} onCreateBranch={onCreateBranch} />
+      ) : !me.ai_enabled ? (
+        <ConnectInApp onSaved={onMeChanged} onUseCopyPaste={() => switchMode("copypaste")} />
+      ) : (
+        <>
+          <div className="chat-msgs" ref={scrollRef}>
+            {messages.length === 0 && !streaming && (
+              <p className="chat-hint">
+                Ask anything about your resume, or type <kbd>/</kbd> for a skill.
+              </p>
+            )}
+            {messages.map((m, i) => (
+              <div key={m.id} className={"chat-msg " + m.role}>
+                {m.blocks.map((b, bi) => renderBlock(b, bi, jdFor(i)))}
+              </div>
+            ))}
+            {streaming && (
+              <div className="chat-msg assistant">
+                {liveBlocks.map((b, bi) => renderBlock(b, bi, liveJd))}
+                {/* Persist a working indicator until the bot actually answers (text) or
+                    produces a result (action/proposal); it stays through read steps. */}
+                {(liveBlocks.length === 0 || liveBlocks[liveBlocks.length - 1].kind === "tool") && (
+                  <div className="chat-working">Working…</div>
+                )}
+              </div>
             )}
           </div>
-        )}
-      </div>
 
-      {err && <p className="err chat-err">{err}</p>}
+          {err && <p className="err chat-err">{err}</p>}
 
-      {skillQuery !== null && filteredSkills.length > 0 && (
-        <div className="chat-skill-menu">
-          {filteredSkills.map((s) => (
-            <button key={s.name} type="button" onClick={() => pickSkill(s.name)}>
-              <span className="sk-name">/{s.name}</span>
-              <span className="sk-desc">{s.description}</span>
+          {skillQuery !== null && filteredSkills.length > 0 && (
+            <div className="chat-skill-menu">
+              {filteredSkills.map((s) => (
+                <button key={s.name} type="button" onClick={() => pickSkill(s.name)}>
+                  <span className="sk-name">/{s.name}</span>
+                  <span className="sk-desc">{s.description}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="chat-input">
+            <textarea
+              ref={inputRef}
+              rows={2}
+              value={input}
+              placeholder="Message the assistant…  (/ for skills · Enter to send, Shift+Enter for newline)"
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+              }}
+            />
+            <button className="primary" disabled={streaming || !input.trim()} onClick={send}>
+              {streaming ? "…" : "Send"}
             </button>
-          ))}
-        </div>
+          </div>
+        </>
       )}
-
-      <div className="chat-input">
-        <textarea
-          ref={inputRef}
-          rows={2}
-          value={input}
-          placeholder="Message the assistant…  (/ for skills · Enter to send, Shift+Enter for newline)"
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
-          }}
-        />
-        <button className="primary" disabled={streaming || !input.trim()} onClick={send}>
-          {streaming ? "…" : "Send"}
-        </button>
-      </div>
     </div>
   );
 }

@@ -188,7 +188,7 @@ export default function App() {
               />
             ) : editDetail ? (
               <div className="edit-fill">
-                <Workbench detail={editDetail} me={me} onCommitted={onCommitted} onOpenSettings={() => setView("settings")} />
+                <Workbench detail={editDetail} me={me} onCommitted={onCommitted} onMeChanged={async () => setMe(await api.me())} />
               </div>
             ) : (
               <div className="content"><p className="muted">Loading…</p></div>
