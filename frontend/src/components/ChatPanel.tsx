@@ -40,8 +40,8 @@ export function ChatPanel({
   const [liveActions, setLiveActions] = useState<AgentAction[]>([]);
   const [err, setErr] = useState("");
   const [skills, setSkills] = useState<Skill[]>([]);
-  const [activeSkill, setActiveSkill] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     api.skills().then(setSkills).catch(() => {});
@@ -69,18 +69,24 @@ export function ChatPanel({
     return skills.filter((s) => s.name.toLowerCase().includes(skillQuery));
   }, [skillQuery, skills]);
 
+  // Picking from the menu just completes the text inline (e.g. "/tailor ").
   function pickSkill(name: string) {
-    setActiveSkill(name);
-    setInput((v) => v.replace(/^\/\S*\s*/, ""));
+    setInput((v) => v.replace(/^\/\S*\s?/, `/${name} `));
+    setTimeout(() => inputRef.current?.focus(), 0);
+  }
+
+  // The active skill is read from the leading /token of the message itself.
+  function detectSkill(raw: string): string | undefined {
+    const m = raw.match(/^\/([\w-]+)/);
+    return m && skills.some((s) => s.name === m[1]) ? m[1] : undefined;
   }
 
   async function send() {
     const text = input.trim();
     if (!text || streaming) return;
-    const skill = activeSkill ?? undefined;
+    const skill = detectSkill(text);
     setInput("");
     setErr("");
-    setActiveSkill(null);
     const userMsg: Msg = {
       id: -Date.now(), role: "user", content: text, proposal: null, created_at: "",
     };
@@ -172,7 +178,7 @@ export function ChatPanel({
         {messages.length === 0 && !streaming && (
           <p className="muted chat-hint">
             Ask for advice, an ATS audit, a base update, or to tailor for a job.
-            Try: <em>[ATS] how does this read for a backend role?</em>
+            Type <em>/</em> to pick a skill, or just ask — e.g. <em>what changed between my last two versions?</em>
           </p>
         )}
         {messages.map((m, i) => (
@@ -235,19 +241,11 @@ export function ChatPanel({
       )}
 
       <div className="chat-input">
-        {activeSkill && (
-          <span
-            className="skill-chip"
-            title="Clear skill"
-            onClick={() => setActiveSkill(null)}
-          >
-            /{activeSkill} ✕
-          </span>
-        )}
         <textarea
+          ref={inputRef}
           rows={2}
           value={input}
-          placeholder="Message the assistant…  (Enter to send, Shift+Enter for newline)"
+          placeholder="Message the assistant…  (/ for skills · Enter to send, Shift+Enter for newline)"
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
@@ -422,5 +420,6 @@ function ProposalCard({
 }
 
 function stripTag(s: string): string {
-  return s.replace(/^\s*\[[A-Z][A-Z ]*\]\s*/, "").trim();
+  // Drop a leading [TAG] or /skill token so a proposal's JD is just the request.
+  return s.replace(/^\s*(\[[A-Z][A-Z ]*\]|\/[\w-]+)\s*/, "").trim();
 }

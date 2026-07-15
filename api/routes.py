@@ -320,6 +320,19 @@ async def chat_send(
     )
     model = body.model or await repo.get_config(session, user.id, KEY_MODEL)
 
+    # Tell the agent where HEAD actually is — confirmed checkouts aren't recorded in
+    # the chat thread, so without this the model can misjudge state from stale history.
+    cur = await repo.current_version(session, user.id)
+    head = None
+    if cur is not None:
+        cur_row = await repo.get_version(session, user.id, cur)
+        if cur_row is not None:
+            head = {
+                "version": cur_row.version,
+                "branch": agent_tools.branch_of(cur_row.label, cur_row.is_base),
+                "is_base": cur_row.is_base,
+            }
+
     # Replay only prior *text* turns as history (proposals are UI-only, never
     # replayed as tool calls — keeps the Messages API history simple and valid).
     prior = await repo.list_messages(session, user.id, thread_key)
@@ -341,7 +354,7 @@ async def chat_send(
             async for kind, payload in agent.stream_chat(
                 credential=key, model=model, baseline=baseline, history=history,
                 user_message=body.message, current_data=body.current_data,
-                skill=body.skill, read_dispatch=read_dispatch,
+                skill=body.skill, head=head, read_dispatch=read_dispatch,
             ):
                 if kind == "delta":
                     parts.append(payload)

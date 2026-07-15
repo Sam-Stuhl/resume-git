@@ -92,6 +92,7 @@ async def stream_chat(
     user_message: str,
     current_data: dict | None = None,
     skill: str | None = None,
+    head: dict | None = None,
     read_dispatch: Callable[[str, dict], Awaitable[dict]],
 ) -> AsyncIterator[tuple[str, object]]:
     """Stream one assistant turn as a bounded, git-aware tool loop.
@@ -116,6 +117,12 @@ async def stream_chat(
 
     skill_obj = get_skill(skill)
     system_text = build_chat_system(baseline, skill_obj.instructions if skill_obj else None)
+    if head is not None:
+        system_text += (
+            f"\n\nCURRENT HEAD: version {head.get('version')} "
+            f"(branch {head.get('branch')}). This is where the repo is right now — "
+            "trust it over older chat history."
+        )
     if current_data is not None and normalize(current_data) != normalize(baseline):
         system_text += (
             "\n\nCURRENTLY VIEWED VERSION (treat as the working resume this turn):\n"

@@ -327,6 +327,16 @@ You have tools to read the version history and act on it:
 - To move HEAD or revert, call checkout / restore — these ask the user to confirm, so
   explain why first, then call the tool as your final action.
 Never claim you performed a write; you propose or request it and the user confirms.
+
+Rules for acting well:
+- Trust the CURRENT HEAD stated below over older chat history; a checkout the user
+  already confirmed will NOT appear as a message, so re-read state (get_current /
+  list_versions) if unsure rather than assuming.
+- Never repeat an action that is already true (e.g. do not checkout the version you
+  are already on).
+- "Make a branch (off X)" means a CONTENT change: call propose_resume (the user's
+  card has a "Create branch" button). It does NOT mean checkout — only use checkout to
+  navigate to view an existing version.
 ─────────────────────────
 """
 
