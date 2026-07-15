@@ -127,7 +127,7 @@ export function Settings({
             </div>
             <div className="field">
               <label>Email</label>
-              <input value={me.email} readOnly disabled />
+              <input value={me.email} readOnly />
               <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>Set by your sign-in; can't be changed here.</div>
             </div>
           </div>
