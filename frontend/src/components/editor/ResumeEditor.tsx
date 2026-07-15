@@ -1,5 +1,6 @@
 import { lazy, Suspense, useState } from "react";
 import type { Resume } from "../../types";
+import { prefs } from "../../lib/prefs";
 import { SectionEditor } from "./SectionEditor";
 
 const RawJsonEditor = lazy(() => import("./RawJsonEditor"));
@@ -9,8 +10,11 @@ const RawJsonEditor = lazy(() => import("./RawJsonEditor"));
  * The raw view is a real code editor (CodeMirror) lazy-loaded on demand.
  */
 export function ResumeEditor({ value, onChange }: { value: Resume; onChange: (r: Resume) => void }) {
-  const [mode, setMode] = useState<"form" | "raw">("form");
-  const [raw, setRaw] = useState("");
+  // Seed from the saved preference (Settings ▸ Appearance ▸ default editor mode).
+  const [mode, setMode] = useState<"form" | "raw">(() => prefs.editorMode());
+  const [raw, setRaw] = useState(() =>
+    prefs.editorMode() === "raw" ? JSON.stringify(value, null, 2) : ""
+  );
   const [err, setErr] = useState("");
 
   const enterRaw = () => {
