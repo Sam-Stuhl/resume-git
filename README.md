@@ -4,12 +4,12 @@ A small web app for managing a resume with full version history, diffing, AI
 tailoring, and one-click PDF compilation. JSON is the single source of truth; a
 LaTeX (Jake's-Resume) template renders it to an ATS-friendly one-page PDF.
 
-Supports **open self-serve signup** — anyone with a Google account can sign in and
-use it (per-user isolated). It runs behind
-[Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/)
-for auth and deploys on a self-hosted [console](https://github.com/Sam-Stuhl/console) PaaS.
-When the door is open, in-app guardrails (fail-closed JWT verification, a signup
-cap, per-user storage/rate limits) keep it safe — see **Deploying**.
+Supports **open self-serve signup** — anyone can sign in with Google and use it
+(per-user isolated). The app does its own auth: **Google OAuth** for sign-in and a
+signed session cookie, so it needs no login gate in front of it. It deploys on a
+self-hosted [console](https://github.com/Sam-Stuhl/console) PaaS. In-app guardrails
+(a signup cap, per-user storage/rate limits) keep the open door safe — see
+**Deploying**.
 
 ## Two kinds of changes
 
@@ -56,7 +56,7 @@ Design intent for the whole app is captured in `PRODUCT.md` and `DESIGN.md`.
 | Backend | FastAPI (`api/`) + SQLAlchemy async (`db/`), reusing `core/` |
 | Frontend | React + Vite + TypeScript SPA (`frontend/`), served by the backend in prod |
 | Data | Postgres (Neon) in prod, SQLite locally — resume JSON stored in-row; **PDFs compiled on demand**, never stored |
-| Auth | Cloudflare Access (Google IdP) — open self-serve (any Google account) or a manual allowlist; the app reads the verified identity header, no in-app login. All data is per-user (scoped by `user_id`); `MAX_USERS` + fail-closed JWT verification guard the open configuration |
+| Auth | The app's own: **Google OAuth** sign-in + a signed session cookie (JWT, httpOnly/Secure/SameSite). Stateless, so it survives the ephemeral-container redeploys. All data is per-user (scoped by `user_id`); a `MAX_USERS` cap guards signup |
 | AI | **Resume Assistant** — a git-aware agent (streaming tool loop over the Claude Messages API); per-user API key *or* Claude Code OAuth token. Copy-paste prompt fallback otherwise |
 
 ## Local development
@@ -79,25 +79,24 @@ Run the tests with `pytest` (the PDF test auto-skips if `pdflatex` is absent).
 
 ## Deploying on `console`
 
-1. Create a Neon Postgres project; note the connection string.
-2. Register the project in the console; set the `DATABASE_URL` secret. (That's
-   the only required secret — Cloudflare Access handles auth at the edge and
-   injects the identity header. `CF_ACCESS_TEAM_DOMAIN`/`CF_ACCESS_AUD` enable
-   the JWT-signature check.)
-3. In Cloudflare Access, gate `resume.samstuhl.com` with Google IdP. For **open
-   signup**, set the Access policy to *allow any Google account* (instead of an
-   email allowlist). Then harden the open door via console env:
-   - `REQUIRE_ACCESS_JWT=1` (with `CF_ACCESS_TEAM_DOMAIN`/`CF_ACCESS_AUD`) — reject
-     any request without a verified Access token, and disable the dev shim.
-   - `MAX_USERS` — cap distinct accounts so a flood can't exhaust the Neon free tier.
-   - `MAX_VERSIONS_PER_USER`, `COMPILE_RATE_PER_MIN`, `CHAT_RATE_PER_MIN` — per-user
-     storage/rate limits (see `console.toml` / `.env.example`).
-   Never set `DEV_USER_EMAIL` in production.
+1. Create a Postgres project (Neon); note the connection string.
+2. Create a **Google OAuth 2.0 Web client** (Google Cloud console → APIs & Services
+   → Credentials). Add the authorized redirect URI
+   `https://resume.samstuhl.com/api/auth/google/callback`. Note the client id + secret.
+3. Register the project in the console and set the secrets:
+   - `DATABASE_URL` — the Postgres connection string.
+   - `SESSION_SECRET` — a random 32+ byte string signing the session cookie
+     (`openssl rand -base64 48`).
+   - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — from step 2.
+   And the env (non-secret): `APP_BASE_URL=https://resume.samstuhl.com` (builds the
+   redirect URI and enables Secure cookies). Optional guardrails: `MAX_USERS`,
+   `MAX_VERSIONS_PER_USER`, `COMPILE_RATE_PER_MIN`, `CHAT_RATE_PER_MIN`. Never set
+   `DEV_USER_EMAIL` in production (it bypasses auth).
 4. Copy `deploy.yml` to `.github/workflows/deploy.yml`. Push to `main` — GitHub
    Actions builds the image (Dockerfile bundles a minimal TeX distro and runs a
    PDF smoke test), and the console pulls and deploys it.
 5. One-time: import your existing CLI data —
-   `DATABASE_URL=<neon-url> python migrate_import.py you@example.com`.
+   `DATABASE_URL=<url> python migrate_import.py you@example.com`.
 
 ## Importing from the CLI
 
