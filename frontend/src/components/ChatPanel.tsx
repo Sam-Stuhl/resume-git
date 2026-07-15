@@ -1,24 +1,46 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "../api";
 import type {
-  AgentAction, ChatMessage, ChatProposal, Me, Resume, Skill, ToolStep,
+  AgentAction, ChatMessage, ChatProposal, Me, Resume, Skill,
 } from "../types";
 import { mergeProposal } from "../lib/proposal";
 import { slugify } from "../lib/git";
 import { GitBranchIcon } from "./icons";
 import { DiffLines, Summary } from "./DiffView";
 
-/** Local message shape: a persisted/finalized ChatMessage plus, for messages
- * produced during this session's live stream, the tool steps and structural
- * actions that accompanied it (rendered as inline lines / confirm cards). */
-type Msg = ChatMessage & { steps?: ToolStep[]; actions?: AgentAction[] };
+/** A turn is an ordered list of blocks in the order they streamed — text, read
+ * steps, structural actions, and proposals interleave sequentially (like Claude),
+ * rather than being bucketed by type. */
+type Block =
+  | { kind: "text"; text: string }
+  | { kind: "tool"; summary: string }
+  | { kind: "action"; action: AgentAction; live: boolean }
+  | { kind: "proposal"; proposal: ChatProposal };
+
+type Msg = { id: number; role: "user" | "assistant"; blocks: Block[] };
+
+/** Rebuild a persisted message into blocks. Reloaded history has no interleaved
+ * read steps (those aren't persisted); structural actions come back static. */
+function toBlocks(m: ChatMessage): Block[] {
+  const blocks: Block[] = [];
+  if (m.content) blocks.push({ kind: "text", text: m.content });
+  const p = m.proposal;
+  if (p && "data" in p) blocks.push({ kind: "proposal", proposal: p as ChatProposal });
+  else if (p && "actions" in p) {
+    for (const a of p.actions) blocks.push({ kind: "action", action: a, live: false });
+  }
+  return blocks;
+}
+
+function suggestedName(p: ChatProposal): string {
+  return p.branch_name || (p.intent === "tailor" ? "Tailored" : "");
+}
 
 /**
- * Resume Assistant — a streaming chat docked in the Workbench. Claude advises and,
- * when asked for a concrete change, returns a proposal the user reviews as a diff
- * and applies (staged into the editor) or turns into a new branch. It can also
- * inspect git history via read tools (shown as inline `▸` step lines) and propose
- * structural actions like checkout/restore (shown as confirm cards).
+ * Resume Assistant — a streaming chat docked in the Workbench. Claude advises,
+ * inspects git history via read tools, proposes résumé changes to review, and can
+ * request structural actions (checkout/restore) with confirmation. Everything in a
+ * turn renders in the order it happened.
  */
 export function ChatPanel({
   threadKey, me, currentData, onApply, onCreateBranch, onOpenSettings, onRepoChanged,
@@ -34,10 +56,7 @@ export function ChatPanel({
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
-  const [liveText, setLiveText] = useState("");
-  const [liveProposal, setLiveProposal] = useState<ChatProposal | null>(null);
-  const [liveSteps, setLiveSteps] = useState<ToolStep[]>([]);
-  const [liveActions, setLiveActions] = useState<AgentAction[]>([]);
+  const [liveBlocks, setLiveBlocks] = useState<Block[]>([]);
   const [err, setErr] = useState("");
   const [skills, setSkills] = useState<Skill[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -52,14 +71,16 @@ export function ChatPanel({
     setMessages([]);
     setErr("");
     api.chatHistory(threadKey)
-      .then((m) => { if (alive) setMessages(m); })
+      .then((rows) => {
+        if (alive) setMessages(rows.map((m) => ({ id: m.id, role: m.role, blocks: toBlocks(m) })));
+      })
       .catch(() => { /* empty thread / not-yet-created is fine */ });
     return () => { alive = false; };
   }, [threadKey]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [messages, liveText, liveProposal, liveSteps, liveActions, streaming]);
+  }, [messages, liveBlocks, streaming]);
 
   // `/` skill menu: show it only while typing the bare /token (no space yet), so it
   // closes as soon as you pick a skill or start typing your actual message.
@@ -81,39 +102,35 @@ export function ChatPanel({
     return m && skills.some((s) => s.name === m[1]) ? m[1] : undefined;
   }
 
-  // Run one streamed assistant turn: manage live state, then finalize the message.
+  // Run one streamed assistant turn, accumulating blocks in arrival order.
   async function runTurn(
     start: (h: import("../api").ChatStreamHandlers) => Promise<void>,
     afterDone?: () => void,
   ) {
     setStreaming(true);
     setErr("");
-    setLiveText(""); setLiveProposal(null); setLiveSteps([]); setLiveActions([]);
-    let text_ = "";
-    let proposal: ChatProposal | null = null;
-    const steps: ToolStep[] = [];
-    const actions: AgentAction[] = [];
+    const acc: Block[] = [];
+    setLiveBlocks([]);
+    const sync = () => setLiveBlocks([...acc]);
     try {
       await start({
-        onDelta: (d) => { text_ += d; setLiveText(text_); },
-        onProposal: (p) => { proposal = p; setLiveProposal(p); },
-        onToolStep: (s) => { steps.push(s); setLiveSteps((v) => [...v, s]); },
-        onAction: (a) => { actions.push(a); setLiveActions((v) => [...v, a]); },
+        onDelta: (d) => {
+          const last = acc[acc.length - 1];
+          if (last && last.kind === "text") last.text += d;
+          else acc.push({ kind: "text", text: d });
+          sync();
+        },
+        onProposal: (p) => { acc.push({ kind: "proposal", proposal: p }); sync(); },
+        onToolStep: (s) => { acc.push({ kind: "tool", summary: s.summary }); sync(); },
+        onAction: (a) => { acc.push({ kind: "action", action: a, live: true }); sync(); },
         onError: (msg) => setErr(msg),
         onDone: () => { /* finalized below */ },
       });
     } catch (e) {
       setErr(String((e as ApiError).message || e));
     } finally {
-      setMessages((m) => [
-        ...m,
-        {
-          id: -Date.now() - 1, role: "assistant", content: text_, proposal, created_at: "",
-          steps: steps.length ? steps : undefined,
-          actions: actions.length ? actions : undefined,
-        },
-      ]);
-      setLiveText(""); setLiveProposal(null); setLiveSteps([]); setLiveActions([]);
+      setMessages((m) => [...m, { id: -Date.now() - 1, role: "assistant", blocks: acc }]);
+      setLiveBlocks([]);
       setStreaming(false);
       afterDone?.();
     }
@@ -124,7 +141,7 @@ export function ChatPanel({
     if (!text || streaming) return;
     const skill = detectSkill(text);
     setInput("");
-    setMessages((m) => [...m, { id: -Date.now(), role: "user", content: text, proposal: null, created_at: "" }]);
+    setMessages((m) => [...m, { id: -Date.now(), role: "user", blocks: [{ kind: "text", text }] }]);
     await runTurn((h) =>
       api.chatStream(threadKey, { message: text, model: me.default_model, current_data: currentData, skill }, h)
     );
@@ -143,13 +160,37 @@ export function ChatPanel({
     );
   }
 
-  function jdFor(index: number): string | null {
-    // The JD/context for a proposal is the user turn just before it.
-    for (let i = index - 1; i >= 0; i--) {
-      if (messages[i].role === "user") return stripTag(messages[i].content);
+  // The JD/context for a proposal is the most recent user turn before message `idx`.
+  function jdFor(idx: number): string | null {
+    for (let i = idx - 1; i >= 0; i--) {
+      if (messages[i].role === "user") {
+        const t = messages[i].blocks.find((b): b is Extract<Block, { kind: "text" }> => b.kind === "text");
+        return t ? stripTag(t.text) : null;
+      }
     }
     return null;
   }
+
+  const renderBlock = (b: Block, key: number, jd: string | null) => {
+    if (b.kind === "text") return b.text ? <div key={key} className="chat-bubble">{b.text}</div> : null;
+    if (b.kind === "tool") return <div key={key} className="tool-step">{b.summary}</div>;
+    if (b.kind === "action") {
+      return b.live
+        ? <ActionCard key={key} action={b.action} disabled={streaming} onResolve={resolveAction} />
+        : <div key={key} className="tool-step">{b.action.summary}</div>;
+    }
+    return (
+      <ProposalCard
+        key={key}
+        proposal={b.proposal}
+        currentData={currentData}
+        suggestedName={suggestedName(b.proposal)}
+        jd={jd}
+        onApply={onApply}
+        onCreateBranch={onCreateBranch}
+      />
+    );
+  };
 
   if (!me.ai_enabled) {
     return (
@@ -162,6 +203,12 @@ export function ChatPanel({
       </div>
     );
   }
+
+  const liveJd = (() => {
+    const lastUser = [...messages].reverse().find((m) => m.role === "user");
+    const t = lastUser?.blocks.find((b): b is Extract<Block, { kind: "text" }> => b.kind === "text");
+    return t ? stripTag(t.text) : null;
+  })();
 
   return (
     <div className="chatpanel">
@@ -188,51 +235,16 @@ export function ChatPanel({
           </p>
         )}
         {messages.map((m, i) => (
-          <Bubble key={m.id} role={m.role} text={m.content}>
-            {m.steps && m.steps.map((s, si) => (
-              <div key={si} className="tool-step">
-{s.summary}</div>
-            ))}
-            {isContentProposal(m.proposal) ? (
-              <ProposalCard
-                proposal={m.proposal}
-                currentData={currentData}
-                suggestedName={m.proposal.intent === "tailor" ? "Tailored" : ""}
-                jd={jdFor(i)}
-                onApply={onApply}
-                onCreateBranch={onCreateBranch}
-              />
-            ) : (
-              persistedActions(m.proposal).map((a, ai) => (
-                <div key={ai} className="tool-step">
-{a.summary}</div>
-              ))
-            )}
-            {m.actions && m.actions.map((a, ai) => (
-              <ActionCard key={ai} action={a} disabled={streaming} onResolve={resolveAction} />
-            ))}
-          </Bubble>
+          <div key={m.id} className={"chat-msg " + m.role}>
+            {m.blocks.map((b, bi) => renderBlock(b, bi, jdFor(i)))}
+          </div>
         ))}
         {streaming && (
-          <Bubble role="assistant" text={liveText || "…"}>
-            {liveSteps.map((s, si) => (
-              <div key={si} className="tool-step">
-{s.summary}</div>
-            ))}
-            {liveProposal && (
-              <ProposalCard
-                proposal={liveProposal}
-                currentData={currentData}
-                suggestedName={liveProposal.intent === "tailor" ? "Tailored" : ""}
-                jd={stripTag(messages[messages.length - 1]?.content ?? "")}
-                onApply={onApply}
-                onCreateBranch={onCreateBranch}
-              />
-            )}
-            {liveActions.map((a, ai) => (
-              <ActionCard key={ai} action={a} disabled={streaming} onResolve={resolveAction} />
-            ))}
-          </Bubble>
+          <div className="chat-msg assistant">
+            {liveBlocks.length
+              ? liveBlocks.map((b, bi) => renderBlock(b, bi, liveJd))
+              : <div className="chat-bubble">…</div>}
+          </div>
         )}
       </div>
 
@@ -264,27 +276,6 @@ export function ChatPanel({
           {streaming ? "…" : "Send"}
         </button>
       </div>
-    </div>
-  );
-}
-
-/** A stored `ChatMessage.proposal` is either a content proposal (has `.data`)
- * or, for turns that only performed structural actions, a `{ actions: [...] }`
- * blob (see `api/routes.py::chat_send`). Narrow on `.data` so the latter never
- * reaches `ProposalCard`. */
-function isContentProposal(p: ChatMessage["proposal"]): p is ChatProposal {
-  return !!p && "data" in p;
-}
-
-function persistedActions(p: ChatMessage["proposal"]): AgentAction[] {
-  return p && "actions" in p ? p.actions : [];
-}
-
-function Bubble({ role, text, children }: { role: string; text: string; children?: React.ReactNode }) {
-  return (
-    <div className={"chat-msg " + role}>
-      {text && <div className="chat-bubble">{text}</div>}
-      {children}
     </div>
   );
 }
@@ -391,7 +382,7 @@ function ProposalCard({
               value={name}
               placeholder="Branch name"
               onChange={(e) => setName(e.target.value)}
-              style={{ maxWidth: 160 }}
+              style={{ maxWidth: 180 }}
             />
             <button
               className="green"

@@ -83,6 +83,7 @@ export interface SectionChange {
 export interface ChatProposal {
   data: Resume;
   intent: "tailor" | "base_update" | null;
+  branch_name?: string | null;   // suggested slug for a tailor branch
   summary: string[];
   diff: DiffLine[];
   section_changes: SectionChange[];

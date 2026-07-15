@@ -83,6 +83,11 @@ PROPOSE_RESUME_TOOL: dict = {
         "properties": {
             "resume": {"type": "object", "description": "Complete updated resume document."},
             "intent": {"type": "string", "enum": ["tailor", "base_update"]},
+            "branch_name": {
+                "type": "string",
+                "description": ("For a tailor: a short slug-friendly branch name from the "
+                                "company/role, e.g. 'halcyon-backend'. Omit for base_update."),
+            },
         },
         "required": ["resume"],
     },

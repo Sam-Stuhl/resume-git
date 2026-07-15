@@ -77,6 +77,7 @@ def _proposal_from(tool_input: dict, current: dict) -> dict:
     return {
         "data": data,
         "intent": tool_input.get("intent"),
+        "branch_name": tool_input.get("branch_name"),
         "summary": summarize_changes(current, data),
         "diff": diff_lines(current, data),
         "section_changes": section_changes(current, data),
