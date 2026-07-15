@@ -6,14 +6,14 @@ import { GitBranchIcon } from "./icons";
 import { DiffLines, Summary } from "./DiffView";
 
 /** The keyless assistant: same four skills as the in-app agent, run through a
- * copy → Claude.ai → paste round-trip. Advice intents (ask/ats) end at the
- * copied prompt; content intents (tailor/base-update) bring the JSON back through
- * a validated diff before anything is committed. */
+ * copy-to-an-AI-chat and paste-back round-trip. Advice intents (ask/ats) end at
+ * the copied prompt; content intents (tailor/base-update) bring the JSON back
+ * through a validated diff before anything is committed. */
 type Intent = "ask" | "ats" | "tailor" | "base-update";
 
 const INTENTS: { id: Intent; label: string; blurb: string; returnsJson: boolean }[] = [
-  { id: "ask", label: "Ask", blurb: "Honest advice on your résumé. Claude replies in prose — nothing to paste back.", returnsJson: false },
-  { id: "ats", label: "ATS audit", blurb: "Audit a version against a job description. Claude replies in prose — nothing to paste back.", returnsJson: false },
+  { id: "ask", label: "Ask", blurb: "Honest advice on your résumé. The AI replies in prose; nothing to paste back.", returnsJson: false },
+  { id: "ats", label: "ATS audit", blurb: "Audit a version against a job description. The AI replies in prose; nothing to paste back.", returnsJson: false },
   { id: "tailor", label: "Tailor", blurb: "Adapt your résumé to a job. Paste the result back to review a diff and open a branch.", returnsJson: true },
   { id: "base-update", label: "Base update", blurb: "Fold a real life change into your baseline. Paste the result back to review and apply it.", returnsJson: true },
 ];
@@ -69,7 +69,7 @@ export function CopyPasteAssistant({
       setErr(
         d?.problems ? "That JSON doesn't look like a valid résumé:\n- " + d.problems.join("\n- ")
         : d?.error ? d.error
-        : "Couldn't read JSON from that paste. Copy Claude's reply again — it should be a single JSON object."
+        : "Couldn't read JSON from that paste. Copy the AI's reply again; it should be a single JSON object."
       );
     } finally { setBusy(false); }
   }
@@ -97,7 +97,7 @@ export function CopyPasteAssistant({
 
       <div className="cp-body">
         <p className="muted cp-intro">
-          No Claude key connected — use any Claude.ai chat. Pick what you want, copy the prompt,
+          No key connected. Use any AI chat: pick what you want, copy the prompt,
           and (for changes) paste the reply back to review it.
         </p>
 
@@ -119,7 +119,7 @@ export function CopyPasteAssistant({
             placeholder={
               needsJd ? "Paste the JD (company, role, requirements, nice-to-haves)…"
               : intent === "ask" ? "e.g. What's the weakest part of my résumé right now?"
-              : "e.g. I finished my internship on Aug 31 — update the end date and write final bullets."
+              : "e.g. I finished my internship on Aug 31; update the end date and write final bullets."
             }
           />
         </div>
@@ -138,22 +138,19 @@ export function CopyPasteAssistant({
 
         {prompt && (
           <div className="card cp-prompt">
-            <div className="row" style={{ justifyContent: "space-between" }}>
-              <span className="section-title">Copy this into Claude</span>
-              <a className="cp-link" href="https://claude.ai/new" target="_blank" rel="noopener noreferrer">Open Claude.ai ↗</a>
-            </div>
+            <p className="section-title">Copy the prompt</p>
             <button onClick={copy}>{copied ? "Copied ✓" : "Copy prompt"}</button>
             <textarea rows={6} readOnly value={prompt} style={{ marginTop: 8 }} />
             {spec.returnsJson ? (
               <>
                 <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
-                  Paste Claude's reply below. Code fences and surrounding prose are fine — we'll pull out the JSON.
+                  Paste it into an AI chat, then paste the reply below. Code fences and surrounding prose are fine; we'll pull out the JSON.
                 </p>
                 <textarea
                   rows={6}
                   value={pasted}
                   onChange={(e) => setPasted(e.target.value)}
-                  placeholder="Paste Claude's reply here…"
+                  placeholder="Paste the AI's reply here"
                 />
                 <div className="row" style={{ marginTop: 8 }}>
                   <button className="accent" disabled={busy || !pasted.trim()} onClick={review}>
@@ -163,7 +160,7 @@ export function CopyPasteAssistant({
               </>
             ) : (
               <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
-                Read Claude's reply right in your chat — this is advice, so there's nothing to paste back.
+                Paste it into an AI chat and read the reply there. This is advice, so there's nothing to paste back.
               </p>
             )}
           </div>
@@ -193,7 +190,7 @@ export function CopyPasteAssistant({
             </div>
             {intent !== "tailor" && (
               <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
-                This loads the update into the editor — review the live preview, then commit it from the bar below.
+                This loads the update into the editor. Review the live preview, then commit it from the bar below.
               </p>
             )}
           </div>
