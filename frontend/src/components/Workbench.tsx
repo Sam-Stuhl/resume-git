@@ -33,11 +33,11 @@ function Resizer({ onDrag }: { onDrag: (dx: number) => void }) {
  * context-aware commit bar, plus the Resume Assistant chat. Committing on a base
  * commit writes a new base (main); on a tailored branch it refines that branch.
  */
-export function Workbench({ detail, me, onCommitted, onOpenSettings }: {
+export function Workbench({ detail, me, onCommitted, onMeChanged }: {
   detail: VersionDetail;
   me: Me | null;
   onCommitted: (v?: number) => void;
-  onOpenSettings: () => void;
+  onMeChanged: () => void | Promise<void>;
 }) {
   const [working, setWorking] = useState<Resume>(detail.data as Resume);
   const [label, setLabel] = useState("");
@@ -151,8 +151,8 @@ export function Workbench({ detail, me, onCommitted, onOpenSettings }: {
               currentData={working}
               onApply={setWorking}
               onCreateBranch={createBranchFromChat}
-              onOpenSettings={onOpenSettings}
               onRepoChanged={onCommitted}
+              onMeChanged={onMeChanged}
             />
           )}
         </div>

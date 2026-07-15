@@ -21,11 +21,10 @@ const INTENTS: { id: Intent; label: string; blurb: string; returnsJson: boolean 
 const NEEDS_JD: Intent[] = ["tailor", "ats"];
 
 export function CopyPasteAssistant({
-  onApply, onCreateBranch, onOpenSettings,
+  onApply, onCreateBranch,
 }: {
   onApply: (resume: Resume) => void;
   onCreateBranch: (data: Resume, label: string, jd: string | null) => Promise<void>;
-  onOpenSettings: () => void;
 }) {
   const [intent, setIntent] = useState<Intent>("tailor");
   const [text, setText] = useState("");        // the JD (tailor/ats) or note (ask/base-update)
@@ -91,15 +90,11 @@ export function CopyPasteAssistant({
   }
 
   return (
-    <div className="chatpanel cp-assistant">
-      <div className="chat-head"><span className="chat-title">Assistant</span>
-        <span className="chat-thread">copy-paste</span></div>
-
-      <div className="cp-body">
-        <p className="muted cp-intro">
-          No key connected. Use any AI chat: pick what you want, copy the prompt,
-          and (for changes) paste the reply back to review it.
-        </p>
+    <div className="cp-body">
+      <p className="muted cp-intro">
+        Use any AI chat: pick what you want, copy the prompt, and (for changes)
+        paste the reply back to review it.
+      </p>
 
         <div className="ed-modebar cp-intents">
           {INTENTS.map((i) => (
@@ -196,13 +191,7 @@ export function CopyPasteAssistant({
           </div>
         )}
 
-        {err && <p className="err" style={{ whiteSpace: "pre-wrap" }}>{err}</p>}
-
-        <p className="muted cp-footer">
-          Prefer it in-app? <button className="linklike" onClick={onOpenSettings}>Connect a Claude key</button> to
-          unlock the streaming assistant.
-        </p>
-      </div>
+      {err && <p className="err" style={{ whiteSpace: "pre-wrap" }}>{err}</p>}
     </div>
   );
 }
