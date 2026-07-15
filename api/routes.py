@@ -268,7 +268,7 @@ async def diff_versions(
     )
 
 
-# ── Resume Copilot chat ───────────────────────────────────────────────────────
+# ── Resume Assistant chat ─────────────────────────────────────────────────────
 @router.get("/skills", response_model=list[schemas.SkillOut])
 async def list_skills(user: User = Depends(get_current_user)):
     return skills_registry.skill_list()

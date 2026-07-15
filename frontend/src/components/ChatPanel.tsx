@@ -265,13 +265,12 @@ export function ChatPanel({
  * or, for turns that only performed structural actions, a `{ actions: [...] }`
  * blob (see `api/routes.py::chat_send`). Narrow on `.data` so the latter never
  * reaches `ProposalCard`. */
-function isContentProposal(p: ChatProposal | null): p is ChatProposal {
-  return !!p && (p as unknown as Record<string, unknown>).data !== undefined;
+function isContentProposal(p: ChatMessage["proposal"]): p is ChatProposal {
+  return !!p && "data" in p;
 }
 
-function persistedActions(p: ChatProposal | null): AgentAction[] {
-  const actions = (p as unknown as { actions?: AgentAction[] } | null)?.actions;
-  return actions ?? [];
+function persistedActions(p: ChatMessage["proposal"]): AgentAction[] {
+  return p && "actions" in p ? p.actions : [];
 }
 
 function Bubble({ role, text, children }: { role: string; text: string; children?: React.ReactNode }) {

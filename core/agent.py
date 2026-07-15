@@ -1,4 +1,4 @@
-"""Resume Copilot — the streaming, tool-using chat agent.
+"""Resume Assistant — the streaming, tool-using chat agent.
 
 Wraps the existing curated resume-advisor system prompt (``core.prompts``) in a
 streaming Claude conversation. Unlike the single-shot ``core.ai`` path this is
@@ -45,9 +45,11 @@ def _tools_for(skill_name: str | None) -> list[dict]:
     """Tool schemas offered to the model: the skill's allow-list, or everything
     (all reads + structural writes + propose_resume) in free-chat advisor mode."""
     skill = get_skill(skill_name)
-    if skill is None:  # advisor default: everything
-        return [agent_tools.ALL_TOOL_SCHEMAS_BY_NAME[n]
-                for n in [*agent_tools.READ_TOOL_NAMES, *agent_tools.WRITE_TOOL_NAMES, "propose_resume"]]
+    if skill is None:  # advisor default: everything, in a stable order for prompt-cache reuse
+        names = ([t["name"] for t in agent_tools.READ_TOOL_SCHEMAS]
+                 + [t["name"] for t in agent_tools.STRUCTURAL_TOOL_SCHEMAS]
+                 + ["propose_resume"])
+        return [agent_tools.ALL_TOOL_SCHEMAS_BY_NAME[n] for n in names]
     return [agent_tools.ALL_TOOL_SCHEMAS_BY_NAME[n] for n in skill.allowed_tools]
 
 
@@ -161,6 +163,8 @@ async def stream_chat(
         writes = [b for b in tool_uses
                  if b.name in agent_tools.WRITE_TOOL_NAMES or b.name == "propose_resume"]
 
+        # A turn mixing reads + writes routes to the write branch below; the reads are
+        # intentionally dropped since the turn ends on the write anyway.
         if reads and not writes:
             tool_results = []
             for b in reads:

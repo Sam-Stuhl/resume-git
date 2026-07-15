@@ -88,14 +88,14 @@ export interface ChatProposal {
   section_changes: SectionChange[];
 }
 
+export interface Skill { name: string; description: string; }
+export interface ToolStep { name: string; summary: string; }
+export interface AgentAction { tool: "checkout" | "restore"; args: Record<string, number>; summary: string; }
+
 export interface ChatMessage {
   id: number;
   role: "user" | "assistant";
   content: string;
-  proposal: ChatProposal | null;
+  proposal: ChatProposal | { actions: AgentAction[] } | null;
   created_at: string;
 }
-
-export interface Skill { name: string; description: string; }
-export interface ToolStep { name: string; summary: string; }
-export interface AgentAction { tool: "checkout" | "restore"; args: Record<string, number>; summary: string; }
