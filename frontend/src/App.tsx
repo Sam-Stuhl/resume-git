@@ -12,6 +12,7 @@ import { Settings } from "./components/Settings";
 import { OnboardingWizard } from "./components/OnboardingWizard";
 import { UserMenu } from "./components/UserMenu";
 import { Tour } from "./components/Tour";
+import { AuthScreen } from "./components/AuthScreen";
 import { GitBranchIcon, MenuIcon } from "./components/icons";
 import { branchName, ref } from "./lib/git";
 import { prefs } from "./lib/prefs";
@@ -58,6 +59,7 @@ export default function App() {
     return s == null ? window.innerWidth > 820 : s === "1";
   });
   const [fatal, setFatal] = useState("");
+  const [needAuth, setNeedAuth] = useState(false);
   const [wizardDismissed, setWizardDismissed] = useState(false);
   const [tourActive, setTourActive] = useState(false);
   const { theme, setTheme } = useTheme();
@@ -80,11 +82,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    api
-      .me()
-      .then(setMe)
-      .catch((e) => setFatal((e as ApiError).status === 401 ? "Not authenticated." : String(e)));
-    refresh().catch((e) => setFatal(String(e)));
+    const on401 = (e: unknown) =>
+      (e as ApiError).status === 401 ? setNeedAuth(true) : setFatal(String(e));
+    api.me().then(setMe).catch(on401);
+    refresh().catch(on401);
   }, [refresh]);
 
   useEffect(() => {
@@ -121,6 +122,7 @@ export default function App() {
     await refresh(selected);
   };
 
+  if (needAuth) return <AuthScreen failed={new URLSearchParams(window.location.search).get("auth") === "failed"} />;
   if (fatal) return <div style={{ padding: 24 }} className="err">{fatal}</div>;
 
   const empty = versions.length === 0;
