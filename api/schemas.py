@@ -89,3 +89,17 @@ class ChatSendIn(BaseModel):
     message: str
     model: str | None = None
     current_data: dict | None = None  # the resume in the editor (viewed branch)
+    skill: str | None = None
+
+
+class ChatContinueIn(BaseModel):
+    tool: str                        # "checkout" | "restore"
+    args: dict
+    approved: bool
+    model: str | None = None
+    current_data: dict | None = None
+
+
+class SkillOut(BaseModel):
+    name: str
+    description: str

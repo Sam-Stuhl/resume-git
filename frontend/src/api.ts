@@ -1,10 +1,13 @@
 import type {
-  ChatMessage, ChatProposal, DiffOut, Me, TailorPreview, VersionDetail, VersionMeta,
+  AgentAction, ChatMessage, ChatProposal, DiffOut, Me, Skill, TailorPreview, ToolStep,
+  VersionDetail, VersionMeta,
 } from "./types";
 
 export interface ChatStreamHandlers {
   onDelta: (text: string) => void;
   onProposal: (proposal: ChatProposal) => void;
+  onToolStep: (step: ToolStep) => void;
+  onAction: (action: AgentAction) => void;
   onError: (message: string) => void;
   onDone: () => void;
 }
@@ -35,6 +38,47 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(res.status, detail);
   }
   return res.json() as Promise<T>;
+}
+
+// Shared SSE reader for the chat endpoints (hand-rolled over fetch, no dep).
+async function streamSSE(url: string, body: unknown, h: ChatStreamHandlers): Promise<void> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(body),
+  });
+  if (!res.ok || !res.body) {
+    let detail: unknown;
+    try {
+      detail = (await res.json()).detail;
+    } catch {
+      detail = res.statusText;
+    }
+    throw new ApiError(res.status, detail);
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    let idx: number;
+    while ((idx = buf.indexOf("\n\n")) >= 0) {
+      const frame = buf.slice(0, idx);
+      buf = buf.slice(idx + 2);
+      const line = frame.split("\n").find((l) => l.startsWith("data: "));
+      if (!line) continue;
+      const evt = JSON.parse(line.slice(6)) as { type: string; data: unknown };
+      if (evt.type === "delta") h.onDelta(evt.data as string);
+      else if (evt.type === "proposal") h.onProposal(evt.data as ChatProposal);
+      else if (evt.type === "tool_step") h.onToolStep(evt.data as ToolStep);
+      else if (evt.type === "action") h.onAction(evt.data as AgentAction);
+      else if (evt.type === "error") h.onError(evt.data as string);
+      else if (evt.type === "done") h.onDone();
+    }
+  }
 }
 
 export const api = {
@@ -68,6 +112,8 @@ export const api = {
 
   sessionPrompt: () => req<{ prompt: string }>("/api/prompts/session"),
 
+  skills: () => req<Skill[]>("/api/skills"),
+
   // Compile unsaved data to a PDF blob for the live preview.
   previewPdf: async (data: unknown): Promise<Blob> => {
     const res = await fetch("/api/preview/pdf", {
@@ -94,48 +140,19 @@ export const api = {
   clearChat: (thread: string) =>
     req(`/api/chat/${encodeURIComponent(thread)}`, { method: "DELETE" }),
 
-  // Stream one assistant turn over SSE, dispatching frames to handlers.
-  chatStream: async (
+  // Stream a message turn over SSE.
+  chatStream: (
     thread: string,
-    body: { message: string; model?: string; current_data?: unknown },
+    body: { message: string; model?: string; current_data?: unknown; skill?: string },
     h: ChatStreamHandlers
-  ): Promise<void> => {
-    const res = await fetch(`/api/chat/${encodeURIComponent(thread)}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify(body),
-    });
-    if (!res.ok || !res.body) {
-      let detail: unknown;
-      try {
-        detail = (await res.json()).detail;
-      } catch {
-        detail = res.statusText;
-      }
-      throw new ApiError(res.status, detail);
-    }
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buf = "";
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += decoder.decode(value, { stream: true });
-      let idx: number;
-      while ((idx = buf.indexOf("\n\n")) >= 0) {
-        const frame = buf.slice(0, idx);
-        buf = buf.slice(idx + 2);
-        const line = frame.split("\n").find((l) => l.startsWith("data: "));
-        if (!line) continue;
-        const evt = JSON.parse(line.slice(6)) as { type: string; data: unknown };
-        if (evt.type === "delta") h.onDelta(evt.data as string);
-        else if (evt.type === "proposal") h.onProposal(evt.data as ChatProposal);
-        else if (evt.type === "error") h.onError(evt.data as string);
-        else if (evt.type === "done") h.onDone();
-      }
-    }
-  },
+  ): Promise<void> => streamSSE(`/api/chat/${encodeURIComponent(thread)}`, body, h),
+
+  // Resolve a confirmed structural action, then stream the agent's continuation.
+  chatContinue: (
+    thread: string,
+    body: { tool: string; args: Record<string, number>; approved: boolean; model?: string; current_data?: unknown },
+    h: ChatStreamHandlers
+  ): Promise<void> => streamSSE(`/api/chat/${encodeURIComponent(thread)}/continue`, body, h),
 
   importBundle: (
     bundle: { versions: unknown[]; current_version?: number | null },

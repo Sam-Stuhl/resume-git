@@ -1,18 +1,49 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "../api";
-import type { ChatMessage, ChatProposal, Me, Resume } from "../types";
+import type {
+  AgentAction, ChatMessage, ChatProposal, Me, Resume, Skill,
+} from "../types";
 import { mergeProposal } from "../lib/proposal";
 import { slugify } from "../lib/git";
 import { GitBranchIcon } from "./icons";
 import { DiffLines, Summary } from "./DiffView";
 
+/** A turn is an ordered list of blocks in the order they streamed — text, read
+ * steps, structural actions, and proposals interleave sequentially (like Claude),
+ * rather than being bucketed by type. */
+type Block =
+  | { kind: "text"; text: string }
+  | { kind: "tool"; summary: string }
+  | { kind: "action"; action: AgentAction; live: boolean }
+  | { kind: "proposal"; proposal: ChatProposal };
+
+type Msg = { id: number; role: "user" | "assistant"; blocks: Block[] };
+
+/** Rebuild a persisted message into blocks. Reloaded history has no interleaved
+ * read steps (those aren't persisted); structural actions come back static. */
+function toBlocks(m: ChatMessage): Block[] {
+  const blocks: Block[] = [];
+  if (m.content) blocks.push({ kind: "text", text: m.content });
+  const p = m.proposal;
+  if (p && "data" in p) blocks.push({ kind: "proposal", proposal: p as ChatProposal });
+  else if (p && "actions" in p) {
+    for (const a of p.actions) blocks.push({ kind: "action", action: a, live: false });
+  }
+  return blocks;
+}
+
+function suggestedName(p: ChatProposal): string {
+  return p.branch_name || (p.intent === "tailor" ? "Tailored" : "");
+}
+
 /**
- * Resume Assistant — a streaming chat docked in the Workbench. Claude advises and,
- * when asked for a concrete change, returns a proposal the user reviews as a diff
- * and applies (staged into the editor) or turns into a new branch.
+ * Resume Assistant — a streaming chat docked in the Workbench. Claude advises,
+ * inspects git history via read tools, proposes résumé changes to review, and can
+ * request structural actions (checkout/restore) with confirmation. Everything in a
+ * turn renders in the order it happened.
  */
 export function ChatPanel({
-  threadKey, me, currentData, onApply, onCreateBranch, onOpenSettings,
+  threadKey, me, currentData, onApply, onCreateBranch, onOpenSettings, onRepoChanged,
 }: {
   threadKey: string;
   me: Me;
@@ -20,90 +51,164 @@ export function ChatPanel({
   onApply: (resume: Resume) => void;
   onCreateBranch: (data: Resume, label: string, jd: string | null) => Promise<void>;
   onOpenSettings: () => void;
+  onRepoChanged: (v?: number) => void;
 }) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
-  const [liveText, setLiveText] = useState("");
-  const [liveProposal, setLiveProposal] = useState<ChatProposal | null>(null);
+  const [liveBlocks, setLiveBlocks] = useState<Block[]>([]);
   const [err, setErr] = useState("");
+  const [skills, setSkills] = useState<Skill[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    api.skills().then(setSkills).catch(() => {});
+  }, []);
 
   useEffect(() => {
     let alive = true;
     setMessages([]);
     setErr("");
     api.chatHistory(threadKey)
-      .then((m) => { if (alive) setMessages(m); })
+      .then((rows) => {
+        if (alive) setMessages(rows.map((m) => ({ id: m.id, role: m.role, blocks: toBlocks(m) })));
+      })
       .catch(() => { /* empty thread / not-yet-created is fine */ });
     return () => { alive = false; };
   }, [threadKey]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [messages, liveText, liveProposal, streaming]);
+  }, [messages, liveBlocks, streaming]);
+
+  // `/` skill menu: show it only while typing the bare /token (no space yet), so it
+  // closes as soon as you pick a skill or start typing your actual message.
+  const skillQuery = /^\/\S*$/.test(input) ? input.slice(1).toLowerCase() : null;
+  const filteredSkills = useMemo(() => {
+    if (skillQuery === null) return [];
+    return skills.filter((s) => s.name.toLowerCase().includes(skillQuery));
+  }, [skillQuery, skills]);
+
+  // Picking from the menu just completes the text inline (e.g. "/tailor ").
+  function pickSkill(name: string) {
+    setInput((v) => v.replace(/^\/\S*\s?/, `/${name} `));
+    setTimeout(() => inputRef.current?.focus(), 0);
+  }
+
+  // The active skill is read from the leading /token of the message itself.
+  function detectSkill(raw: string): string | undefined {
+    const m = raw.match(/^\/([\w-]+)/);
+    return m && skills.some((s) => s.name === m[1]) ? m[1] : undefined;
+  }
+
+  // Run one streamed assistant turn, accumulating blocks in arrival order.
+  async function runTurn(
+    start: (h: import("../api").ChatStreamHandlers) => Promise<void>,
+    afterDone?: () => void,
+  ) {
+    setStreaming(true);
+    setErr("");
+    const acc: Block[] = [];
+    setLiveBlocks([]);
+    const sync = () => setLiveBlocks([...acc]);
+    try {
+      await start({
+        onDelta: (d) => {
+          const last = acc[acc.length - 1];
+          if (last && last.kind === "text") last.text += d;
+          else acc.push({ kind: "text", text: d });
+          sync();
+        },
+        onProposal: (p) => { acc.push({ kind: "proposal", proposal: p }); sync(); },
+        onToolStep: (s) => { acc.push({ kind: "tool", summary: s.summary }); sync(); },
+        onAction: (a) => { acc.push({ kind: "action", action: a, live: true }); sync(); },
+        onError: (msg) => setErr(msg),
+        onDone: () => { /* finalized below */ },
+      });
+    } catch (e) {
+      setErr(String((e as ApiError).message || e));
+    } finally {
+      setMessages((m) => [...m, { id: -Date.now() - 1, role: "assistant", blocks: acc }]);
+      setLiveBlocks([]);
+      setStreaming(false);
+      afterDone?.();
+    }
+  }
 
   async function send() {
     const text = input.trim();
     if (!text || streaming) return;
+    const skill = detectSkill(text);
     setInput("");
-    setErr("");
-    const userMsg: ChatMessage = {
-      id: -Date.now(), role: "user", content: text, proposal: null, created_at: "",
-    };
-    setMessages((m) => [...m, userMsg]);
-    setStreaming(true);
-    setLiveText("");
-    setLiveProposal(null);
-
-    let text_ = "";
-    let proposal: ChatProposal | null = null;
-    try {
-      await api.chatStream(
-        threadKey,
-        { message: text, model: me.default_model, current_data: currentData },
-        {
-          onDelta: (d) => { text_ += d; setLiveText(text_); },
-          onProposal: (p) => { proposal = p; setLiveProposal(p); },
-          onError: (msg) => setErr(msg),
-          onDone: () => { /* finalized below */ },
-        }
-      );
-    } catch (e) {
-      setErr(String((e as ApiError).message || e));
-    } finally {
-      setMessages((m) => [
-        ...m,
-        { id: -Date.now() - 1, role: "assistant", content: text_, proposal, created_at: "" },
-      ]);
-      setLiveText("");
-      setLiveProposal(null);
-      setStreaming(false);
-    }
+    setMessages((m) => [...m, { id: -Date.now(), role: "user", blocks: [{ kind: "text", text }] }]);
+    await runTurn((h) =>
+      api.chatStream(threadKey, { message: text, model: me.default_model, current_data: currentData, skill }, h)
+    );
   }
 
-  function jdFor(index: number): string | null {
-    // The JD/context for a proposal is the user turn just before it.
-    for (let i = index - 1; i >= 0; i--) {
-      if (messages[i].role === "user") return stripTag(messages[i].content);
+  // Approve/decline a structural action; the agent executes it and keeps going.
+  async function resolveAction(action: AgentAction, approved: boolean) {
+    if (streaming) return;
+    await runTurn(
+      (h) => api.chatContinue(
+        threadKey,
+        { tool: action.tool, args: action.args, approved, model: me.default_model, current_data: currentData },
+        h,
+      ),
+      () => { if (approved) onRepoChanged(action.tool === "checkout" ? action.args.version : undefined); },
+    );
+  }
+
+  // The JD/context for a proposal is the most recent user turn before message `idx`.
+  function jdFor(idx: number): string | null {
+    for (let i = idx - 1; i >= 0; i--) {
+      if (messages[i].role === "user") {
+        const t = messages[i].blocks.find((b): b is Extract<Block, { kind: "text" }> => b.kind === "text");
+        return t ? stripTag(t.text) : null;
+      }
     }
     return null;
   }
+
+  const renderBlock = (b: Block, key: number, jd: string | null) => {
+    if (b.kind === "text") return b.text ? <div key={key} className="chat-bubble">{b.text}</div> : null;
+    if (b.kind === "tool") return <div key={key} className="tool-step">{b.summary}</div>;
+    if (b.kind === "action") {
+      return b.live
+        ? <ActionCard key={key} action={b.action} disabled={streaming} onResolve={resolveAction} />
+        : <div key={key} className="tool-step">{b.action.summary}</div>;
+    }
+    return (
+      <ProposalCard
+        key={key}
+        proposal={b.proposal}
+        currentData={currentData}
+        suggestedName={suggestedName(b.proposal)}
+        jd={jd}
+        onApply={onApply}
+        onCreateBranch={onCreateBranch}
+      />
+    );
+  };
 
   if (!me.ai_enabled) {
     return (
       <div className="chatpanel">
         <div className="chat-head"><span className="chat-title">Assistant</span></div>
         <div className="chat-empty">
-          <p className="muted">
-            Add a Claude API key or a Claude Code token in Settings to chat with your
-            resume advisor.
-          </p>
+          <p>Connect a Claude API key or Claude Code token to start.</p>
           <button className="accent" onClick={onOpenSettings}>Open Settings</button>
         </div>
       </div>
     );
   }
+
+  const liveJd = (() => {
+    const lastUser = [...messages].reverse().find((m) => m.role === "user");
+    const t = lastUser?.blocks.find((b): b is Extract<Block, { kind: "text" }> => b.kind === "text");
+    return t ? stripTag(t.text) : null;
+  })();
 
   return (
     <div className="chatpanel">
@@ -125,48 +230,46 @@ export function ChatPanel({
 
       <div className="chat-msgs" ref={scrollRef}>
         {messages.length === 0 && !streaming && (
-          <p className="muted chat-hint">
-            Ask for advice, an ATS audit, a base update, or to tailor for a job.
-            Try: <em>[ATS] how does this read for a backend role?</em>
+          <p className="chat-hint">
+            Ask anything about your resume — or type <kbd>/</kbd> for a skill.
           </p>
         )}
         {messages.map((m, i) => (
-          <Bubble key={m.id} role={m.role} text={m.content}>
-            {m.proposal && (
-              <ProposalCard
-                proposal={m.proposal}
-                currentData={currentData}
-                suggestedName={m.proposal.intent === "tailor" ? "Tailored" : ""}
-                jd={jdFor(i)}
-                onApply={onApply}
-                onCreateBranch={onCreateBranch}
-              />
-            )}
-          </Bubble>
+          <div key={m.id} className={"chat-msg " + m.role}>
+            {m.blocks.map((b, bi) => renderBlock(b, bi, jdFor(i)))}
+          </div>
         ))}
         {streaming && (
-          <Bubble role="assistant" text={liveText || "…"}>
-            {liveProposal && (
-              <ProposalCard
-                proposal={liveProposal}
-                currentData={currentData}
-                suggestedName={liveProposal.intent === "tailor" ? "Tailored" : ""}
-                jd={stripTag(messages[messages.length - 1]?.content ?? "")}
-                onApply={onApply}
-                onCreateBranch={onCreateBranch}
-              />
+          <div className="chat-msg assistant">
+            {liveBlocks.map((b, bi) => renderBlock(b, bi, liveJd))}
+            {/* Persist a working indicator until the bot actually answers (text) or
+                produces a result (action/proposal) — it stays through read steps. */}
+            {(liveBlocks.length === 0 || liveBlocks[liveBlocks.length - 1].kind === "tool") && (
+              <div className="chat-working">Working…</div>
             )}
-          </Bubble>
+          </div>
         )}
       </div>
 
       {err && <p className="err chat-err">{err}</p>}
 
+      {skillQuery !== null && filteredSkills.length > 0 && (
+        <div className="chat-skill-menu">
+          {filteredSkills.map((s) => (
+            <button key={s.name} type="button" onClick={() => pickSkill(s.name)}>
+              <span className="sk-name">/{s.name}</span>
+              <span className="sk-desc">{s.description}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="chat-input">
         <textarea
+          ref={inputRef}
           rows={2}
           value={input}
-          placeholder="Message the assistant…  (Enter to send, Shift+Enter for newline)"
+          placeholder="Message the assistant…  (/ for skills · Enter to send, Shift+Enter for newline)"
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
@@ -180,11 +283,25 @@ export function ChatPanel({
   );
 }
 
-function Bubble({ role, text, children }: { role: string; text: string; children?: React.ReactNode }) {
+/** Permission prompt for a structural action (checkout/restore). Resolving hands
+ * the decision to the server, which executes it and streams the agent's
+ * continuation — so approving doesn't dead-end the chat. */
+function ActionCard({ action, disabled, onResolve }: {
+  action: AgentAction;
+  disabled: boolean;
+  onResolve: (action: AgentAction, approved: boolean) => void;
+}) {
+  const [done, setDone] = useState<"" | "done" | "cancelled">("");
+
+  if (done === "done") return <div className="action-card done">✓ {action.summary}</div>;
+  if (done === "cancelled") return <div className="action-card">✕ Cancelled — {action.summary}</div>;
   return (
-    <div className={"chat-msg " + role}>
-      {text && <div className="chat-bubble">{text}</div>}
-      {children}
+    <div className="action-card">
+      <span>{action.summary}?</span>
+      <div className="row">
+        <button className="green" disabled={disabled} onClick={() => { setDone("done"); onResolve(action, true); }}>Confirm</button>
+        <button disabled={disabled} onClick={() => { setDone("cancelled"); onResolve(action, false); }}>Cancel</button>
+      </div>
     </div>
   );
 }
@@ -268,7 +385,7 @@ function ProposalCard({
               value={name}
               placeholder="Branch name"
               onChange={(e) => setName(e.target.value)}
-              style={{ maxWidth: 160 }}
+              style={{ maxWidth: 180 }}
             />
             <button
               className="green"
@@ -290,5 +407,6 @@ function ProposalCard({
 }
 
 function stripTag(s: string): string {
-  return s.replace(/^\s*\[[A-Z][A-Z ]*\]\s*/, "").trim();
+  // Drop a leading [TAG] or /skill token so a proposal's JD is just the request.
+  return s.replace(/^\s*(\[[A-Z][A-Z ]*\]|\/[\w-]+)\s*/, "").trim();
 }

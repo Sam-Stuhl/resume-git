@@ -36,7 +36,7 @@ function Resizer({ onDrag }: { onDrag: (dx: number) => void }) {
 export function Workbench({ detail, me, onCommitted, onOpenSettings }: {
   detail: VersionDetail;
   me: Me | null;
-  onCommitted: (v: number) => void;
+  onCommitted: (v?: number) => void;
   onOpenSettings: () => void;
 }) {
   const [working, setWorking] = useState<Resume>(detail.data as Resume);
@@ -152,6 +152,7 @@ export function Workbench({ detail, me, onCommitted, onOpenSettings }: {
               onApply={setWorking}
               onCreateBranch={createBranchFromChat}
               onOpenSettings={onOpenSettings}
+              onRepoChanged={onCommitted}
             />
           )}
         </div>

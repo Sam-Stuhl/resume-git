@@ -313,33 +313,59 @@ def build_session_prompt(baseline: dict) -> str:
     return SESSION_PROMPT_TEMPLATE.replace("__BASELINE_JSON__", baseline_str)
 
 
-# Appended to the session prompt when Claude runs as the interactive Resume
-# Copilot (the streaming chat). It overrides the template's "JSON only" output
-# rule: prose is the channel, and concrete resume changes come through a tool.
-CHAT_MODE_ADDENDUM = """\
+# Appended to the session prompt when Claude runs as the interactive, git-aware
+# Resume Assistant (the streaming chat + tool loop). It overrides the template's
+# "JSON only" output rule: prose is the channel, and reads/writes come through tools.
+GIT_TOOLS_CONTEXT = """\
 
 ─────────────────────────
-INTERACTIVE CHAT MODE (overrides the output-format rules above)
+YOU CAN OPERATE THE RESUME REPO (git-style)
 
-You are now running as an interactive chat assistant embedded in the resume app,
-not the copy-paste CLI. So:
+You have tools to read the version history and act on it:
+- Read freely to ground yourself: list_versions, get_version, diff_versions, get_current.
+- To change resume CONTENT, call propose_resume (the user reviews a diff and applies it).
+- To move HEAD or revert, call checkout / restore — these ask the user to confirm, so
+  explain why first, then call the tool as your final action.
+Never claim you performed a write; you propose or request it and the user confirms.
 
-- Reply conversationally in plain prose. Be concise and direct — a few sentences,
-  not essays. Do NOT dump raw JSON into the chat.
-- When the user wants a concrete resume change — a [TAILOR] for a job or a
-  [BASE UPDATE] life change — call the `propose_resume` tool with the COMPLETE
-  updated resume as its `resume` argument (full `{personal, sections}` document,
-  not a fragment). Add one short sentence of prose explaining what you changed and
-  why; the user reviews a diff before anything is saved.
-- For [ASK] (advice) and [ATS] (audit) turns, answer in prose only. Do NOT call
-  the tool — you are not proposing a change yet.
-- Only call `propose_resume` once per turn, and only when a real change is wanted.
-- The resume you propose must stay truthful to the baseline facts; never invent
-  experience, numbers, or credentials.
+Rules for acting well:
+- Trust the CURRENT HEAD stated below over older chat history; a checkout the user
+  already confirmed will NOT appear as a message, so re-read state (get_current /
+  list_versions) if unsure rather than assuming.
+- Never repeat an action that is already true (e.g. do not checkout the version you
+  are already on).
+- "Make a branch (off X)" means a CONTENT change: call propose_resume (the user's
+  card has a "Create branch" button). It does NOT mean checkout — only use checkout to
+  navigate to view an existing version.
 ─────────────────────────
 """
 
 
-def build_chat_system(baseline: dict) -> str:
-    """Session prompt + the interactive-chat addendum, for the streaming Copilot."""
-    return build_session_prompt(baseline) + CHAT_MODE_ADDENDUM
+CONCISE_STYLE = """\
+
+─────────────────────────
+RESPONSE STYLE — KEEP IT SHORT (this overrides any verbosity elsewhere)
+
+You are in a small chat panel. Be brief and direct:
+- Default to 1–3 sentences. Lead with the answer; skip preamble and don't restate the
+  question or recap what you're about to do.
+- No long caveat lists or hedging. One caveat max, only if it really matters.
+- When you propose a change, ONE short sentence on what you changed — the user sees the
+  diff, so don't describe it in prose.
+- For an ATS audit, use a few terse bullets (hits / gaps / top 2–3 fixes), not paragraphs.
+- Don't ask a pile of clarifying questions; make a reasonable choice and note the one
+  thing you assumed. Only ask if you genuinely can't proceed.
+Short and useful beats thorough and long. Every time.
+─────────────────────────
+"""
+
+
+def build_chat_system(baseline: dict, skill_instructions: str | None) -> str:
+    """Shared advisor preamble + git-tools context + brevity + (skill instructions or default)."""
+    base = build_session_prompt(baseline)  # reuse identity + ATS knowledge + baseline
+    focus = skill_instructions or (
+        "\nYou are in free-chat advisor mode. Answer questions, read history to ground "
+        "yourself, and offer to tailor, update the baseline, audit (ATS), checkout, or "
+        "restore when useful."
+    )
+    return base + GIT_TOOLS_CONTEXT + CONCISE_STYLE + "\n" + focus
