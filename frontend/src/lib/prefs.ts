@@ -12,6 +12,7 @@ const KEYS = {
   autoCompile: "pref.autoCompile",
   tourSeen: "pref.tourSeen",
   assistantMode: "pref.assistantMode",
+  cpSessionHidden: "pref.cpSessionHidden",
 } as const;
 
 const LANDING_TABS: LandingTab[] = ["edit", "compare", "network", "pdf"];
@@ -70,5 +71,13 @@ export const prefs = {
   },
   setAssistantMode(v: AssistantMode) {
     write(KEYS.assistantMode, v);
+  },
+
+  // Whether the copy-paste "Set up a chat" section is collapsed.
+  cpSessionHidden(): boolean {
+    return read(KEYS.cpSessionHidden) === "1";
+  },
+  setCpSessionHidden(v: boolean) {
+    write(KEYS.cpSessionHidden, v ? "1" : "0");
   },
 };
