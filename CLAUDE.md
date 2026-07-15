@@ -12,6 +12,16 @@ fix separate from the feature that surfaced it).
 Still commit/push only when asked, and branch off `main` for new work (never commit
 straight to `main`).
 
+## Writing style
+
+**Never use em dashes anywhere.** Not in UI copy, code comments, prompts, docs, or
+commit messages. Use a colon, a period, parentheses, or "to" (for ranges) instead.
+
+Copy-paste prompt flows (onboarding "Paste & convert", the keyless assistant) must
+stay AI-chat-agnostic. Don't name Claude in that UI, since the user pastes the prompt
+into whatever chat they use. Only the in-app credential/API path is Claude-specific
+(Settings, "connect a key"), because the API only supports Claude.
+
 ## Verify before handing off
 
 Run `pytest` and the frontend `tsc --noEmit` + `vite build` before calling work
