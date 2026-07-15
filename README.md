@@ -19,6 +19,25 @@ for auth and deploys on a self-hosted [console](https://github.com/Sam-Stuhl/con
 Nothing is ever overwritten: every save is a new version, and you can restore
 any past one (non-destructively).
 
+## Resume Assistant
+
+A curated, streaming AI assistant that operates the repo like git. It reads your
+version history (list / view / diff), proposes résumé changes you review as a
+diff and apply — or open as a branch — and can check out / restore versions with
+confirmation (approving executes the action and the assistant keeps going).
+Four `/`-invokable **skills**, each scoped to only the tools it needs:
+
+- `/ask` — honest advice (read-only)
+- `/ats` — audit a version against a job description (read-only)
+- `/tailor` — adapt your résumé to a job and open it as a branch
+- `/base-update` — incorporate a real life change into the baseline
+
+Bring your own credential in **Settings**: a Claude **API key** (`sk-ant-api…`,
+bills API credits) or a **Claude Code OAuth token** (`sk-ant-oat…`, from
+`claude setup-token`, bills your Claude subscription) — auto-detected. Without
+one, the copy-paste prompt flow still works. Design intent for the whole app is
+captured in `PRODUCT.md` and `DESIGN.md`.
+
 ## Architecture
 
 | Layer | Tech |
@@ -27,8 +46,8 @@ any past one (non-destructively).
 | Backend | FastAPI (`api/`) + SQLAlchemy async (`db/`), reusing `core/` |
 | Frontend | React + Vite + TypeScript SPA (`frontend/`), served by the backend in prod |
 | Data | Postgres (Neon) in prod, SQLite locally — resume JSON stored in-row; **PDFs compiled on demand**, never stored |
-| Auth | Cloudflare Access (Google IdP, email allowlist) — the app reads the verified identity header; no in-app login |
-| AI | Claude API (`anthropic`) when a key is set; copy-paste prompt fallback otherwise |
+| Auth | Cloudflare Access (Google IdP, email allowlist) — the app reads the verified identity header; no in-app login. All data is per-user (scoped by `user_id`) |
+| AI | **Resume Assistant** — a git-aware agent (streaming tool loop over the Claude Messages API); per-user API key *or* Claude Code OAuth token. Copy-paste prompt fallback otherwise |
 
 ## Local development
 
@@ -77,19 +96,29 @@ shown when the account is empty) and upload `resume_export.json`. Every version
 comes across with its labels, base/tailor flags, fork lineage, and the current
 pointer. (Alternatively, `migrate_import.py` writes straight to Postgres.)
 
-## JSON schema
+## Résumé JSON (section model)
+
+A résumé is a header plus an ordered list of **typed sections** — not a fixed set
+of keys — so sections can be added, reordered, and renamed freely:
 
 ```json
 {
-  "personal":   { "name", "email", "phone", "github", "linkedin" },
-  "summary":    "...",
-  "experience": [ { "title", "organization", "location", "start_date", "end_date", "bullets": [] } ],
-  "projects":   [ { "name", "stack", "bullets": [] } ],
-  "leadership": [ { "title", "organization", "location", "start_date", "end_date", "bullets": [] } ],
-  "skills":     { "Languages": "...", "Frameworks & Libraries": "...", ... },
-  "education":  [ { "school", "location", "gpa", "start_date", "end_date", "coursework" } ]
+  "personal": { "name", "email", "phone", "github", "linkedin" },
+  "sections": [
+    { "type": "text",      "title": "Summary",    "text": "..." },
+    { "type": "roles",     "title": "Experience", "entries": [ { "title", "organization", "location", "start_date", "end_date", "bullets": [] } ] },
+    { "type": "projects",  "title": "Projects",   "entries": [ { "name", "stack", "bullets": [] } ] },
+    { "type": "skills",    "title": "Skills",     "groups":  [ { "category", "items" } ] },
+    { "type": "education", "title": "Education",  "entries": [ { "school", "location", "gpa", "start_date", "end_date", "coursework" } ] },
+    { "type": "bullets",   "title": "Awards",     "items":   [ "..." ] }
+  ]
 }
 ```
+
+Section types: `text`, `roles`, `projects`, `skills`, `education`, `bullets`
+(see `core/sections.py`). Legacy fixed-schema data (the old
+`summary`/`experience`/… keys) is upgraded to this model automatically on read,
+so existing versions keep working and render byte-identically.
 
 ## Privacy
 
