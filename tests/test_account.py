@@ -1,4 +1,4 @@
-"""Account & profile: display name, behind_access flag, delete account."""
+"""Account & profile: display name, member-since, delete account."""
 
 import asyncio
 import json
@@ -9,6 +9,7 @@ import pytest
 
 os.environ["DEV_USER_EMAIL"] = "a@example.com"
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///./data/test_api_pytest.db"
+os.environ.setdefault("SESSION_SECRET", "test-session-secret-at-least-32bytes!")
 
 import httpx  # noqa: E402
 from httpx import ASGITransport  # noqa: E402
@@ -16,7 +17,6 @@ from httpx import ASGITransport  # noqa: E402
 SAMPLE = json.loads(
     (Path(__file__).resolve().parent.parent / "samples" / "sample_resume.json").read_text()
 )
-USER_HEADER = "cf-access-authenticated-user-email"
 
 
 @pytest.fixture()
@@ -61,24 +61,20 @@ async def test_me_reports_created_at(client):
     assert (await client.get("/api/me")).json()["created_at"] is not None
 
 
-async def test_behind_access_flag(client):
-    # Dev shim (no Access header) -> not behind Access, so the UI hides logout.
-    assert (await client.get("/api/me")).json()["behind_access"] is False
-    # A request carrying the Access identity header -> behind Access.
-    r = await client.get("/api/me", headers={USER_HEADER: "edge@example.com"})
-    assert r.json()["behind_access"] is True
+async def test_concurrent_first_signin_dont_duplicate(client):
+    # A brand-new user's first sign-ins race to auto-create the account; the
+    # unique-email violation must be swallowed, resolving to one user (not a 500).
+    from api import auth
+    from db.session import SessionLocal
 
+    async def sign_in():
+        async with SessionLocal() as s:
+            u = await auth.resolve_or_create_user(s, "race@example.com")
+            await s.commit()
+            return u.id
 
-async def test_concurrent_first_requests_dont_duplicate(client):
-    # A brand-new user's first requests race to auto-create the account; the
-    # unique-email violation must be swallowed, not surfaced as a 500.
-    email = "race@example.com"
-    results = await asyncio.gather(
-        client.get("/api/me", headers={USER_HEADER: email}),
-        client.get("/api/versions", headers={USER_HEADER: email}),
-        client.get("/api/me", headers={USER_HEADER: email}),
-    )
-    assert all(r.status_code == 200 for r in results)
+    ids = await asyncio.gather(sign_in(), sign_in(), sign_in())
+    assert len(set(ids)) == 1
 
 
 async def test_delete_account_wipes_everything(client):

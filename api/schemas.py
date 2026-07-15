@@ -16,7 +16,6 @@ class Me(BaseModel):
     credential_kind: str | None = None  # "api" | "oauth" | None (no credential set)
     display_name: str | None = None     # account display name (users.display_name)
     created_at: str | None = None        # ISO8601, "member since"
-    behind_access: bool = False          # true when the request came through Cloudflare Access
 
 
 class VersionMeta(BaseModel):

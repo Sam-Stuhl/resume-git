@@ -1,18 +1,18 @@
-"""All API routes, scoped to the Cloudflare-Access-identified user."""
+"""All API routes, scoped to the signed-in user (see api.auth / api.deps)."""
 
 from __future__ import annotations
 
 import asyncio
 import json
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import services
 from api import limits, schemas
-from api.deps import ACCESS_EMAIL_HEADER, get_current_user
+from api.deps import get_current_user
 from core import agent, ai, prompts, schema
 from core import skills as skills_registry
 from core import tools as agent_tools
@@ -76,9 +76,7 @@ async def _ai_state(session: AsyncSession, user_id: int) -> tuple[bool, str]:
     return (bool(key) and enabled, model)
 
 
-async def _me(
-    session: AsyncSession, user: User, behind_access: bool = False
-) -> schemas.Me:
+async def _me(session: AsyncSession, user: User) -> schemas.Me:
     ai_enabled, model = await _ai_state(session, user.id)
     key = await repo.get_config(session, user.id, KEY_API)
     return schemas.Me(
@@ -86,33 +84,24 @@ async def _me(
         credential_kind=_credential_kind(key),
         display_name=user.display_name,
         created_at=user.created_at.isoformat() if user.created_at else None,
-        behind_access=behind_access,
     )
-
-
-def _behind_access(request: Request) -> bool:
-    """True when the request came through Cloudflare Access (the identity header
-    is present). False under the local dev shim — so the UI hides logout."""
-    return bool(request.headers.get(ACCESS_EMAIL_HEADER))
 
 
 # ── Identity / settings ──────────────────────────────────────────────────────
 @router.get("/me", response_model=schemas.Me)
 async def me(
-    request: Request,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    return await _me(session, user, _behind_access(request))
+    return await _me(session, user)
 
 
 @router.get("/settings", response_model=schemas.Me)
 async def get_settings(
-    request: Request,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    return await _me(session, user, _behind_access(request))
+    return await _me(session, user)
 
 
 @router.put("/settings")
