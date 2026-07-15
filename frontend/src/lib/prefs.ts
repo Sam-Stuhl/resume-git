@@ -9,6 +9,7 @@ const KEYS = {
   landingTab: "pref.landingTab",
   editorMode: "pref.editorMode",
   autoCompile: "pref.autoCompile",
+  tourSeen: "pref.tourSeen",
 } as const;
 
 const LANDING_TABS: LandingTab[] = ["edit", "compare", "network", "pdf"];
@@ -50,5 +51,13 @@ export const prefs = {
   },
   setAutoCompile(v: boolean) {
     write(KEYS.autoCompile, v ? "1" : "0");
+  },
+
+  // Whether the first-run product tour has been shown.
+  tourSeen(): boolean {
+    return read(KEYS.tourSeen) === "1";
+  },
+  setTourSeen(v: boolean) {
+    write(KEYS.tourSeen, v ? "1" : "0");
   },
 };

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { LOGOUT_URL } from "../api";
 import type { Me } from "../types";
-import { GearIcon, SignOutIcon } from "./icons";
+import { CompassIcon, GearIcon, SignOutIcon } from "./icons";
 
 /** Derive up-to-two-letter initials for the avatar. */
 function initials(me: Me): string {
@@ -15,7 +15,11 @@ function initials(me: Me): string {
 
 /** Top-right identity menu: avatar → dropdown with who you are, Settings, and
  * Log out. Logout only appears behind Cloudflare Access (nothing to end in dev). */
-export function UserMenu({ me, onOpenSettings }: { me: Me; onOpenSettings: () => void }) {
+export function UserMenu({ me, onOpenSettings, onStartTour }: {
+  me: Me;
+  onOpenSettings: () => void;
+  onStartTour: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -50,6 +54,9 @@ export function UserMenu({ me, onOpenSettings }: { me: Me; onOpenSettings: () =>
             {me.display_name && <div className="usermenu-name">{me.display_name}</div>}
             <div className="usermenu-email">{me.email}</div>
           </div>
+          <button className="usermenu-item" role="menuitem" onClick={() => { setOpen(false); onStartTour(); }}>
+            <CompassIcon size={14} /> Take a tour
+          </button>
           <button className="usermenu-item" role="menuitem" onClick={() => { setOpen(false); onOpenSettings(); }}>
             <GearIcon size={14} /> Settings
           </button>

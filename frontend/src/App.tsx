@@ -11,6 +11,7 @@ import { CommitModal } from "./components/CommitModal";
 import { Settings } from "./components/Settings";
 import { OnboardingWizard } from "./components/OnboardingWizard";
 import { UserMenu } from "./components/UserMenu";
+import { Tour } from "./components/Tour";
 import { GitBranchIcon, MenuIcon } from "./components/icons";
 import { branchName, ref } from "./lib/git";
 import { prefs } from "./lib/prefs";
@@ -58,7 +59,10 @@ export default function App() {
   });
   const [fatal, setFatal] = useState("");
   const [wizardDismissed, setWizardDismissed] = useState(false);
+  const [tourActive, setTourActive] = useState(false);
   const { theme, setTheme } = useTheme();
+
+  const startTour = useCallback(() => { setView("edit"); setTourActive(true); }, []);
 
   useEffect(() => { localStorage.setItem("railOpen", railOpen ? "1" : "0"); }, [railOpen]);
 
@@ -97,6 +101,15 @@ export default function App() {
     if (versions.length === 0 && !wizardDismissed) setView("edit");
   }, [versions.length, wizardDismissed]);
 
+  // First-run product tour: auto-start once the account has a résumé (i.e. past
+  // onboarding) and the tour hasn't been shown. Delay lets the editor mount so
+  // the spotlight targets exist.
+  useEffect(() => {
+    if (versions.length === 0 || prefs.tourSeen()) return;
+    const t = setTimeout(() => { setView("edit"); setTourActive(true); }, 500);
+    return () => clearTimeout(t);
+  }, [versions.length]);
+
   const onCommitted = async (v?: number) => {
     await refresh(v);
     setMe(await api.me());
@@ -131,7 +144,7 @@ export default function App() {
         <button className="accent branch-btn" onClick={() => setView("tailor")} disabled={empty}>
           <GitBranchIcon size={14} /> <span className="nb-text">New branch</span>
         </button>
-        {me && <UserMenu me={me} onOpenSettings={() => setView("settings")} />}
+        {me && <UserMenu me={me} onOpenSettings={() => setView("settings")} onStartTour={startTour} />}
       </div>
 
       <div className="layout">
@@ -208,6 +221,7 @@ export default function App() {
           )}
         </main>
       </div>
+      {tourActive && <Tour onClose={() => setTourActive(false)} />}
       {modalVersion != null && (
         <CommitModal versions={versions} version={modalVersion} onClose={() => setModalVersion(null)} />
       )}

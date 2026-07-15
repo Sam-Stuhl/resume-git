@@ -163,6 +163,28 @@ code { font-family: var(--mono); font-size: .92em; background: var(--panel-2); p
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .content { flex: 1; overflow: auto; padding: 16px; }
 
+/* ── First-run product tour (spotlight coach-marks) ── */
+.tour-root { position: fixed; inset: 0; z-index: 200; }
+/* The spotlight: a bright outline plus a huge box-shadow that dims everything else. */
+.tour-spot {
+  position: fixed; border-radius: 8px; pointer-events: none;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, .62), 0 0 0 2px var(--accent);
+  transition: top .18s, left .18s, width .18s, height .18s;
+}
+.tour-pop {
+  position: fixed; max-width: calc(100vw - 24px);
+  background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 14px 16px; box-shadow: 0 12px 34px rgba(0, 0, 0, .4);
+  animation: chat-in .16s cubic-bezier(.22, 1, .36, 1);
+}
+@media (prefers-reduced-motion: reduce) { .tour-pop, .tour-spot { animation: none; transition: none; } }
+.tour-progress { font-size: 11px; color: var(--faint); font-family: var(--mono); margin-bottom: 6px; }
+.tour-title { font-size: 15px; font-weight: 650; letter-spacing: -.01em; margin: 0 0 6px; }
+.tour-body { font-size: 13px; line-height: 1.55; color: var(--muted); margin: 0 0 14px; }
+.tour-actions { display: flex; align-items: center; gap: 8px; }
+.tour-skip { font-size: 12px; color: var(--muted); background: none; border-color: transparent; padding: 4px 8px; }
+.tour-skip:hover { color: var(--text); background: var(--panel-2); }
+
 /* ── Settings (GitHub-org-style two-pane) ── */
 .settings-page { display: flex; gap: 24px; align-items: flex-start; max-width: 900px; }
 .settings-nav {
