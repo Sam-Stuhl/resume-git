@@ -13,7 +13,7 @@ import json
 ONBOARDING_PROMPT = """\
 You are helping me build a structured JSON representation of my resume that will be used by resume-git, a résumé version-control app. This is a one-time onboarding step.
 
-I will paste my existing resume below (as plain text, a copy-paste from a PDF, or however I have it). Your job is to convert it into the exact JSON schema specified below, then return ONLY that JSON. No explanation, no commentary, no markdown code fences. Start your response with `{` and end with `}`.
+My existing resume is provided in this chat (attached as a PDF or file, or pasted as text). Your job is to convert it into the exact JSON schema specified below, then return ONLY that JSON. No explanation, no commentary, no markdown code fences. Start your response with `{` and end with `}`.
 
 REQUIRED SCHEMA:
 
@@ -67,10 +67,7 @@ CONVERSION RULES (informed by 2026 ATS and AI screener behavior):
 
 9. **Include everything from the source for now.** The user will trim later with the tailoring tool. Better to have too much in the baseline than to lose information.
 
-Below is my resume. Return ONLY the JSON, starting with { and ending with }.
-
-MY RESUME:
-[paste your resume here]
+Convert the resume I provided in this chat. Return ONLY the JSON, starting with { and ending with }.
 """
 
 

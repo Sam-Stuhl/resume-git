@@ -51,7 +51,7 @@ export function BranchFlow({ me, onCreated }: { me: Me; onCreated: (v: number) =
   async function showPrompt() {
     setErr("");
     try {
-      // Full tailor prompt with the JD injected — one copy, no manual re-assembly.
+      // Full tailor prompt with the JD injected (one copy, no manual re-assembly).
       setPrompt((await api.copyPrompt({ intent: "tailor", jd_text: jd })).prompt);
     } catch (e) {
       const d: any = (e as ApiError).detail;
@@ -69,7 +69,7 @@ export function BranchFlow({ me, onCreated }: { me: Me; onCreated: (v: number) =
       const d: any = (e as ApiError).detail;
       setErr(
         d?.problems ? "That JSON isn't a valid résumé:\n- " + d.problems.join("\n- ")
-        : "Couldn't read JSON from that paste. Copy Claude's reply again."
+        : "Couldn't read JSON from that paste. Copy the AI's reply again."
       );
     } finally {
       setBusy(false);
@@ -103,8 +103,8 @@ export function BranchFlow({ me, onCreated }: { me: Me; onCreated: (v: number) =
           </div>
         ) : (
           <div className="row">
-            <button disabled={!jd.trim()} onClick={showPrompt}>Get the prompt (copy into Claude)</button>
-            <span className="muted" style={{ fontSize: 12 }}>No Claude key connected — copy-paste mode. Connect one in Settings to draft in-app.</span>
+            <button disabled={!jd.trim()} onClick={showPrompt}>Get the prompt</button>
+            <span className="muted" style={{ fontSize: 12 }}>No key connected: copy-paste mode. Connect one in Settings to draft in-app.</span>
           </div>
         )}
         {err && <p className="err">{err}</p>}
@@ -130,16 +130,13 @@ export function BranchFlow({ me, onCreated }: { me: Me; onCreated: (v: number) =
       {prompt && (
         <div className="card">
           <p className="section-title">Session prompt</p>
-          <div className="row" style={{ justifyContent: "space-between" }}>
-            <button onClick={() => navigator.clipboard.writeText(prompt)}>Copy prompt</button>
-            <a className="cp-link" href="https://claude.ai/new" target="_blank" rel="noopener noreferrer">Open Claude.ai ↗</a>
-          </div>
+          <button onClick={() => navigator.clipboard.writeText(prompt)}>Copy prompt</button>
           <textarea rows={7} readOnly value={prompt} style={{ marginTop: 8 }} />
           <p className="muted" style={{ fontSize: 12 }}>
-            Paste it into a new Claude chat — the JD is already included. Then paste Claude's reply below
+            Paste it into an AI chat; the JD is already included. Then paste the reply below
             (code fences and surrounding prose are fine).
           </p>
-          <textarea rows={7} value={pasted} onChange={(e) => setPasted(e.target.value)} placeholder="Paste Claude's reply here…" />
+          <textarea rows={7} value={pasted} onChange={(e) => setPasted(e.target.value)} placeholder="Paste the AI's reply here" />
           <div className="row" style={{ marginTop: 8 }}>
             <button className="accent" disabled={busy || !pasted.trim()} onClick={reviewPasted}>
               {busy ? "Reading…" : "Review changes"}

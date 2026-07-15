@@ -9,10 +9,12 @@ import { Compare } from "./components/Compare";
 import { NetworkGraph } from "./components/NetworkGraph";
 import { CommitModal } from "./components/CommitModal";
 import { Settings } from "./components/Settings";
-import { ImportPanel } from "./components/ImportPanel";
 import { OnboardingWizard } from "./components/OnboardingWizard";
+import { UserMenu } from "./components/UserMenu";
+import { Tour } from "./components/Tour";
 import { GitBranchIcon, MenuIcon } from "./components/icons";
 import { branchName, ref } from "./lib/git";
+import { prefs } from "./lib/prefs";
 
 type View = "edit" | "compare" | "network" | "pdf" | "settings" | "tailor";
 const TABS: { id: View; label: string }[] = [
@@ -49,7 +51,7 @@ export default function App() {
   const [current, setCurrent] = useState<number | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [detail, setDetail] = useState<VersionDetail | null>(null);
-  const [view, setView] = useState<View>("edit");
+  const [view, setView] = useState<View>(() => prefs.landingTab());
   const [modalVersion, setModalVersion] = useState<number | null>(null);
   const [railOpen, setRailOpen] = useState<boolean>(() => {
     const s = localStorage.getItem("railOpen");
@@ -57,7 +59,10 @@ export default function App() {
   });
   const [fatal, setFatal] = useState("");
   const [wizardDismissed, setWizardDismissed] = useState(false);
+  const [tourActive, setTourActive] = useState(false);
   const { theme, setTheme } = useTheme();
+
+  const startTour = useCallback(() => { setView("edit"); setTourActive(true); }, []);
 
   useEffect(() => { localStorage.setItem("railOpen", railOpen ? "1" : "0"); }, [railOpen]);
 
@@ -89,6 +94,21 @@ export default function App() {
     }
     api.version(selected).then(setDetail).catch(() => setDetail(null));
   }, [selected]);
+
+  // A brand-new empty account must land on the onboarding wizard (Edit view),
+  // regardless of the saved default-landing-tab preference.
+  useEffect(() => {
+    if (versions.length === 0 && !wizardDismissed) setView("edit");
+  }, [versions.length, wizardDismissed]);
+
+  // First-run product tour: auto-start once the account has a résumé (i.e. past
+  // onboarding) and the tour hasn't been shown. Delay lets the editor mount so
+  // the spotlight targets exist.
+  useEffect(() => {
+    if (versions.length === 0 || prefs.tourSeen()) return;
+    const t = setTimeout(() => { setView("edit"); setTourActive(true); }, 500);
+    return () => clearTimeout(t);
+  }, [versions.length]);
 
   const onCommitted = async (v?: number) => {
     await refresh(v);
@@ -124,6 +144,7 @@ export default function App() {
         <button className="accent branch-btn" onClick={() => setView("tailor")} disabled={empty}>
           <GitBranchIcon size={14} /> <span className="nb-text">New branch</span>
         </button>
+        {me && <UserMenu me={me} onOpenSettings={() => setView("settings")} onStartTour={startTour} />}
       </div>
 
       <div className="layout">
@@ -188,15 +209,19 @@ export default function App() {
                 <Compare versions={versions} selected={selected} />
               )}
               {view === "settings" && me && (
-                <>
-                  <Settings me={me} theme={theme} setTheme={setTheme} onChange={async () => setMe(await api.me())} />
-                  <ImportPanel onImported={() => refresh()} />
-                </>
+                <Settings
+                  me={me}
+                  theme={theme}
+                  setTheme={setTheme}
+                  onChange={async () => setMe(await api.me())}
+                  onImported={() => refresh()}
+                />
               )}
             </div>
           )}
         </main>
       </div>
+      {tourActive && <Tour onClose={() => setTourActive(false)} />}
       {modalVersion != null && (
         <CommitModal versions={versions} version={modalVersion} onClose={() => setModalVersion(null)} />
       )}

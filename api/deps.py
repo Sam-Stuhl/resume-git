@@ -23,6 +23,7 @@ import time
 import httpx
 import jwt
 from fastapi import Depends, Header, HTTPException, Request
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db import repo
@@ -103,10 +104,21 @@ async def get_current_user(
 
 async def _resolve_user(session: AsyncSession, email: str) -> User:
     """Look up the user, creating them on first sight — unless a new account
-    would exceed ``MAX_USERS``, in which case signups are closed (403)."""
+    would exceed ``MAX_USERS``, in which case signups are closed (403).
+
+    A brand-new user's first two requests (``/api/me`` and ``/api/versions``)
+    arrive concurrently; both can see "no user" and try to INSERT. Catch the
+    resulting unique-email violation and re-read the row the winner created.
+    """
     user = await repo.get_user(session, email)
     if user is None:
         if MAX_USERS and await repo.count_users(session) >= MAX_USERS:
             raise HTTPException(status_code=403, detail="Signups are currently full.")
-        user = await repo.create_user(session, email)
+        try:
+            user = await repo.create_user(session, email)
+        except IntegrityError:
+            await session.rollback()
+            user = await repo.get_user(session, email)
+            if user is None:
+                raise
     return user

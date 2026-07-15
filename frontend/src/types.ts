@@ -3,6 +3,9 @@ export interface Me {
   ai_enabled: boolean;
   default_model: string;
   credential_kind?: "api" | "oauth" | null;
+  display_name?: string | null;
+  created_at?: string | null;
+  behind_access?: boolean;
 }
 
 export interface VersionMeta {

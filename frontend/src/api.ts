@@ -84,10 +84,11 @@ async function streamSSE(url: string, body: unknown, h: ChatStreamHandlers): Pro
 export const api = {
   me: () => req<Me>("/api/me"),
   settings: () => req<Me>("/api/settings"),
-  saveSettings: (b: { default_model?: string; ai_enabled?: boolean }) =>
+  saveSettings: (b: { default_model?: string; ai_enabled?: boolean; display_name?: string }) =>
     req("/api/settings", { method: "PUT", body: JSON.stringify(b) }),
   saveApiKey: (api_key: string) =>
     req("/api/settings/api-key", { method: "PUT", body: JSON.stringify({ api_key }) }),
+  deleteAccount: () => req<{ ok: boolean }>("/api/account", { method: "DELETE" }),
 
   versions: () => req<VersionMeta[]>("/api/versions"),
   version: (v: number) => req<VersionDetail>(`/api/versions/${v}`),
@@ -182,3 +183,7 @@ export const pdfUrl = {
   current: () => "/api/pdf/current",
   version: (v: number) => `/api/versions/${v}/pdf`,
 };
+
+// Cloudflare Access clears its session cookie at this path on the app's own
+// domain. No backend route needed. Only meaningful when Me.behind_access is true.
+export const LOGOUT_URL = "/cdn-cgi/access/logout";

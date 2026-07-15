@@ -34,3 +34,19 @@ export function MenuIcon({ size = 16, className }: P) {
     </svg>
   );
 }
+
+export function CompassIcon({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0Zm0 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13Zm3.28 2.22a.75.75 0 0 1 .96.96l-1.6 4.19a1.5 1.5 0 0 1-.86.86l-4.19 1.6a.75.75 0 0 1-.96-.96l1.6-4.19a1.5 1.5 0 0 1 .86-.86l4.19-1.6ZM8 7a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z" />
+    </svg>
+  );
+}
+
+export function SignOutIcon({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M2 2.75C2 1.784 2.784 1 3.75 1h2.5a.75.75 0 0 1 0 1.5h-2.5a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h2.5a.75.75 0 0 1 0 1.5h-2.5A1.75 1.75 0 0 1 2 13.25Zm10.44 4.5-1.97-1.97a.749.749 0 0 1 1.06-1.06l3.25 3.25a.749.749 0 0 1 0 1.06l-3.25 3.25a.749.749 0 1 1-1.06-1.06l1.97-1.97H6.75a.75.75 0 0 1 0-1.5Z" />
+    </svg>
+  );
+}
