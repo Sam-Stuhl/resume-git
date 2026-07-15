@@ -152,6 +152,7 @@ export function Workbench({ detail, me, onCommitted, onOpenSettings }: {
               onApply={setWorking}
               onCreateBranch={createBranchFromChat}
               onOpenSettings={onOpenSettings}
+              onRepoChanged={(v) => { if (v !== undefined) onCommitted(v); }}
             />
           )}
         </div>

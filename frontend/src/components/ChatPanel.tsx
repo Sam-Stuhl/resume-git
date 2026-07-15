@@ -1,18 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "../api";
-import type { ChatMessage, ChatProposal, Me, Resume } from "../types";
+import type {
+  AgentAction, ChatMessage, ChatProposal, Me, Resume, Skill, ToolStep,
+} from "../types";
 import { mergeProposal } from "../lib/proposal";
 import { slugify } from "../lib/git";
 import { GitBranchIcon } from "./icons";
 import { DiffLines, Summary } from "./DiffView";
 
+/** Local message shape: a persisted/finalized ChatMessage plus, for messages
+ * produced during this session's live stream, the tool steps and structural
+ * actions that accompanied it (rendered as inline lines / confirm cards). */
+type Msg = ChatMessage & { steps?: ToolStep[]; actions?: AgentAction[] };
+
 /**
  * Resume Assistant — a streaming chat docked in the Workbench. Claude advises and,
  * when asked for a concrete change, returns a proposal the user reviews as a diff
- * and applies (staged into the editor) or turns into a new branch.
+ * and applies (staged into the editor) or turns into a new branch. It can also
+ * inspect git history via read tools (shown as inline `▸` step lines) and propose
+ * structural actions like checkout/restore (shown as confirm cards).
  */
 export function ChatPanel({
-  threadKey, me, currentData, onApply, onCreateBranch, onOpenSettings,
+  threadKey, me, currentData, onApply, onCreateBranch, onOpenSettings, onRepoChanged,
 }: {
   threadKey: string;
   me: Me;
@@ -20,14 +29,23 @@ export function ChatPanel({
   onApply: (resume: Resume) => void;
   onCreateBranch: (data: Resume, label: string, jd: string | null) => Promise<void>;
   onOpenSettings: () => void;
+  onRepoChanged: (v?: number) => void;
 }) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [liveText, setLiveText] = useState("");
   const [liveProposal, setLiveProposal] = useState<ChatProposal | null>(null);
+  const [liveSteps, setLiveSteps] = useState<ToolStep[]>([]);
+  const [liveActions, setLiveActions] = useState<AgentAction[]>([]);
   const [err, setErr] = useState("");
+  const [skills, setSkills] = useState<Skill[]>([]);
+  const [activeSkill, setActiveSkill] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    api.skills().then(setSkills).catch(() => {});
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -41,32 +59,51 @@ export function ChatPanel({
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [messages, liveText, liveProposal, streaming]);
+  }, [messages, liveText, liveProposal, liveSteps, liveActions, streaming]);
+
+  // `/` skill menu: while the input starts with "/", filter skills by the text
+  // that follows (up to the first space).
+  const skillQuery = input.startsWith("/") ? input.slice(1).split(/\s/, 1)[0].toLowerCase() : null;
+  const filteredSkills = useMemo(() => {
+    if (skillQuery === null) return [];
+    return skills.filter((s) => s.name.toLowerCase().includes(skillQuery));
+  }, [skillQuery, skills]);
+
+  function pickSkill(name: string) {
+    setActiveSkill(name);
+    setInput((v) => v.replace(/^\/\S*\s*/, ""));
+  }
 
   async function send() {
     const text = input.trim();
     if (!text || streaming) return;
+    const skill = activeSkill ?? undefined;
     setInput("");
     setErr("");
-    const userMsg: ChatMessage = {
+    setActiveSkill(null);
+    const userMsg: Msg = {
       id: -Date.now(), role: "user", content: text, proposal: null, created_at: "",
     };
     setMessages((m) => [...m, userMsg]);
     setStreaming(true);
     setLiveText("");
     setLiveProposal(null);
+    setLiveSteps([]);
+    setLiveActions([]);
 
     let text_ = "";
     let proposal: ChatProposal | null = null;
+    const steps: ToolStep[] = [];
+    const actions: AgentAction[] = [];
     try {
       await api.chatStream(
         threadKey,
-        { message: text, model: me.default_model, current_data: currentData },
+        { message: text, model: me.default_model, current_data: currentData, skill },
         {
           onDelta: (d) => { text_ += d; setLiveText(text_); },
           onProposal: (p) => { proposal = p; setLiveProposal(p); },
-          onToolStep: () => {},
-          onAction: () => {},
+          onToolStep: (s) => { steps.push(s); setLiveSteps((v) => [...v, s]); },
+          onAction: (a) => { actions.push(a); setLiveActions((v) => [...v, a]); },
           onError: (msg) => setErr(msg),
           onDone: () => { /* finalized below */ },
         }
@@ -76,10 +113,16 @@ export function ChatPanel({
     } finally {
       setMessages((m) => [
         ...m,
-        { id: -Date.now() - 1, role: "assistant", content: text_, proposal, created_at: "" },
+        {
+          id: -Date.now() - 1, role: "assistant", content: text_, proposal, created_at: "",
+          steps: steps.length ? steps : undefined,
+          actions: actions.length ? actions : undefined,
+        },
       ]);
       setLiveText("");
       setLiveProposal(null);
+      setLiveSteps([]);
+      setLiveActions([]);
       setStreaming(false);
     }
   }
@@ -134,7 +177,10 @@ export function ChatPanel({
         )}
         {messages.map((m, i) => (
           <Bubble key={m.id} role={m.role} text={m.content}>
-            {m.proposal && (
+            {m.steps && m.steps.map((s, si) => (
+              <div key={si} className="tool-step">▸ {s.summary}</div>
+            ))}
+            {isContentProposal(m.proposal) ? (
               <ProposalCard
                 proposal={m.proposal}
                 currentData={currentData}
@@ -143,11 +189,21 @@ export function ChatPanel({
                 onApply={onApply}
                 onCreateBranch={onCreateBranch}
               />
+            ) : (
+              persistedActions(m.proposal).map((a, ai) => (
+                <div key={ai} className="tool-step">▸ {a.summary}</div>
+              ))
             )}
+            {m.actions && m.actions.map((a, ai) => (
+              <ActionCard key={ai} action={a} onRepoChanged={onRepoChanged} />
+            ))}
           </Bubble>
         ))}
         {streaming && (
           <Bubble role="assistant" text={liveText || "…"}>
+            {liveSteps.map((s, si) => (
+              <div key={si} className="tool-step">▸ {s.summary}</div>
+            ))}
             {liveProposal && (
               <ProposalCard
                 proposal={liveProposal}
@@ -158,13 +214,36 @@ export function ChatPanel({
                 onCreateBranch={onCreateBranch}
               />
             )}
+            {liveActions.map((a, ai) => (
+              <ActionCard key={ai} action={a} onRepoChanged={onRepoChanged} />
+            ))}
           </Bubble>
         )}
       </div>
 
       {err && <p className="err chat-err">{err}</p>}
 
+      {skillQuery !== null && filteredSkills.length > 0 && (
+        <div className="chat-skill-menu">
+          {filteredSkills.map((s) => (
+            <button key={s.name} type="button" onClick={() => pickSkill(s.name)}>
+              <span className="sk-name">/{s.name}</span>
+              <span className="sk-desc">{s.description}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="chat-input">
+        {activeSkill && (
+          <span
+            className="skill-chip"
+            title="Clear skill"
+            onClick={() => setActiveSkill(null)}
+          >
+            /{activeSkill} ✕
+          </span>
+        )}
         <textarea
           rows={2}
           value={input}
@@ -182,11 +261,63 @@ export function ChatPanel({
   );
 }
 
+/** A stored `ChatMessage.proposal` is either a content proposal (has `.data`)
+ * or, for turns that only performed structural actions, a `{ actions: [...] }`
+ * blob (see `api/routes.py::chat_send`). Narrow on `.data` so the latter never
+ * reaches `ProposalCard`. */
+function isContentProposal(p: ChatProposal | null): p is ChatProposal {
+  return !!p && (p as unknown as Record<string, unknown>).data !== undefined;
+}
+
+function persistedActions(p: ChatProposal | null): AgentAction[] {
+  const actions = (p as unknown as { actions?: AgentAction[] } | null)?.actions;
+  return actions ?? [];
+}
+
 function Bubble({ role, text, children }: { role: string; text: string; children?: React.ReactNode }) {
   return (
     <div className={"chat-msg " + role}>
       {text && <div className="chat-bubble">{text}</div>}
       {children}
+    </div>
+  );
+}
+
+/** A confirm card for a structural action (checkout/restore) the agent proposed
+ * mid-turn. Confirming calls the corresponding API then reports the resulting
+ * version upward so the HEAD badge + history rail refresh. */
+function ActionCard({ action, onRepoChanged }: {
+  action: AgentAction;
+  onRepoChanged: (v?: number) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState<"" | "done" | "cancelled">("");
+
+  const run = async () => {
+    setBusy(true);
+    try {
+      if (action.tool === "checkout") {
+        await api.setCurrent(action.args.version);
+        onRepoChanged(action.args.version);
+      } else {
+        const r = await api.restore(action.args.version);
+        onRepoChanged(r.version);
+      }
+      setDone("done");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (done === "done") return <div className="action-card done">✓ {action.summary}</div>;
+  if (done === "cancelled") return <div className="action-card done">✕ cancelled — {action.summary}</div>;
+  return (
+    <div className="action-card">
+      <span>{action.summary}?</span>
+      <div className="row">
+        <button className="green" disabled={busy} onClick={run}>Confirm</button>
+        <button disabled={busy} onClick={() => setDone("cancelled")}>Cancel</button>
+      </div>
     </div>
   );
 }
