@@ -146,10 +146,7 @@ export function ChatPanel({
       <div className="chatpanel">
         <div className="chat-head"><span className="chat-title">Assistant</span></div>
         <div className="chat-empty">
-          <p className="muted">
-            Add a Claude API key or a Claude Code token in Settings to chat with your
-            resume advisor.
-          </p>
+          <p>Connect a Claude API key or Claude Code token to start.</p>
           <button className="accent" onClick={onOpenSettings}>Open Settings</button>
         </div>
       </div>
@@ -176,9 +173,8 @@ export function ChatPanel({
 
       <div className="chat-msgs" ref={scrollRef}>
         {messages.length === 0 && !streaming && (
-          <p className="muted chat-hint">
-            Ask for advice, an ATS audit, a base update, or to tailor for a job.
-            Type <em>/</em> to pick a skill, or just ask — e.g. <em>what changed between my last two versions?</em>
+          <p className="chat-hint">
+            Ask anything about your resume — or type <kbd>/</kbd> for a skill.
           </p>
         )}
         {messages.map((m, i) => (
