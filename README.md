@@ -15,12 +15,10 @@ self-hosted [console](https://github.com/Sam-Stuhl/console) PaaS. In-app guardra
 
 ## Screenshots
 
-<table>
-  <tr>
-    <td width="52%" valign="top"><img src="docs/img/editor.png" alt="Structured section editor with a git-style history rail"><br><sub><b>Structured editor.</b> Typed sections plus a git-style history rail.</sub></td>
-    <td width="48%" valign="top"><img src="docs/img/pdf-output.png" alt="Compiled one-page ATS-friendly PDF"><br><sub><b>Compiled PDF.</b> One-page, ATS-friendly, rendered on demand.</sub></td>
-  </tr>
-</table>
+Structured section editor with a live PDF preview (typed sections and a git-style
+history rail on the left; the compiled one-page, ATS-friendly PDF on the right):
+
+![resume-git editor with a live PDF preview of the compiled resume](docs/img/app.webp)
 
 Branch and tailor for a job (tailored versions fork from your base):
 
