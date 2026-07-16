@@ -39,4 +39,7 @@ COPY --from=frontend /app/frontend/dist ./frontend/dist
 RUN PYTHONPATH=/app python scripts/pdf_smoke_test.py
 
 EXPOSE 8080
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8080"]
+# --proxy-headers so the app honors X-Forwarded-Proto/Host from Traefik (behind
+# the Cloudflare tunnel) when it matters for request scheme/host.
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8080", \
+     "--proxy-headers", "--forwarded-allow-ips", "*"]

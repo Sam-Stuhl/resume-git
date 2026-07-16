@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, ApiError, LOGOUT_URL } from "../api";
+import { api, ApiError } from "../api";
 import type { Me } from "../types";
 import { prefs, type EditorMode, type LandingTab } from "../lib/prefs";
 import { ImportPanel } from "./ImportPanel";
@@ -224,15 +224,9 @@ export function Settings({
                 )}
               </div>
             </div>
-            {me.behind_access ? (
-              <a className="btn-logout" href={LOGOUT_URL}>
-                <SignOutIcon size={14} /> Log out
-              </a>
-            ) : (
-              <p className="muted" style={{ fontSize: 12 }}>
-                Sign-in is managed by Cloudflare Access; there's no session to log out of in local dev.
-              </p>
-            )}
+            <button className="btn-logout" onClick={async () => { await api.logout().catch(() => {}); window.location.href = "/"; }}>
+              <SignOutIcon size={14} /> Log out
+            </button>
           </div>
         )}
 
@@ -262,9 +256,9 @@ function DangerZone({ me }: { me: Me }) {
     setErr("");
     try {
       await api.deleteAccount();
-      // Fully sign out behind Access; in dev just reload into a fresh account.
-      if (me.behind_access) window.location.href = LOGOUT_URL;
-      else window.location.reload();
+      // Clear the now-orphaned session and return to the sign-in screen.
+      await api.logout().catch(() => {});
+      window.location.href = "/";
     } catch (e) {
       setErr(String((e as ApiError).message));
       setBusy(false);

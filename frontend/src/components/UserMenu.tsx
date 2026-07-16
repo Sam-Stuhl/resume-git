@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { LOGOUT_URL } from "../api";
+import { api } from "../api";
 import type { Me } from "../types";
 import { CompassIcon, GearIcon, SignOutIcon } from "./icons";
+
+async function logout() {
+  try { await api.logout(); } catch { /* clear client state regardless */ }
+  window.location.href = "/";
+}
 
 /** Derive up-to-two-letter initials for the avatar. */
 function initials(me: Me): string {
@@ -60,11 +65,9 @@ export function UserMenu({ me, onOpenSettings, onStartTour }: {
           <button className="usermenu-item" role="menuitem" onClick={() => { setOpen(false); onOpenSettings(); }}>
             <GearIcon size={14} /> Settings
           </button>
-          {me.behind_access && (
-            <a className="usermenu-item" role="menuitem" href={LOGOUT_URL}>
-              <SignOutIcon size={14} /> Log out
-            </a>
-          )}
+          <button className="usermenu-item" role="menuitem" onClick={() => { setOpen(false); logout(); }}>
+            <SignOutIcon size={14} /> Log out
+          </button>
         </div>
       )}
     </div>

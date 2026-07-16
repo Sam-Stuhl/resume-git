@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from api.auth import router as auth_router
 from api.routes import router
 from db.session import init_db
 
@@ -41,6 +42,7 @@ async def health():
     return {"status": "ok"}
 
 
+app.include_router(auth_router)
 app.include_router(router)
 
 

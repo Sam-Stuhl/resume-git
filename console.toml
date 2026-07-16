@@ -2,17 +2,18 @@
 # Validated on every build before anything touches Docker.
 
 # Runtime secrets, by NAME only (values live in the console, never in git):
-#   DATABASE_URL   Neon Postgres connection string (REQUIRED)
+#   DATABASE_URL           Postgres connection string (REQUIRED)
+#   SESSION_SECRET         random 32+ byte string that signs the session cookie
+#                          (REQUIRED). Generate: `openssl rand -base64 48`.
+#   GOOGLE_CLIENT_ID       Google OAuth web-client id (REQUIRED for sign-in)
+#   GOOGLE_CLIENT_SECRET   Google OAuth web-client secret (REQUIRED for sign-in)
 #
-# Cloudflare Access gates this app and injects the authenticated-email header.
-# For OPEN self-serve signup, set the Access policy to "allow any Google account"
-# (instead of a manual email allowlist). When the door is open, harden the app:
-#   CF_ACCESS_TEAM_DOMAIN    e.g. https://yourteam.cloudflareaccess.com
-#   CF_ACCESS_AUD            the Access application's AUD tag
-#   REQUIRE_ACCESS_JWT=1     fail closed — reject any request without a verified
-#                            Access token (needs the two CF_ACCESS_* above)
-# And bound resource use (see [env] below). DEV_USER_EMAIL must NEVER be set here.
-secrets = ["DATABASE_URL"]
+# The app does its OWN auth now (Cloudflare Access is gone): users sign in with
+# Google and get a signed session cookie. In the Google Cloud console create an
+# OAuth 2.0 Web client and add this authorized redirect URI:
+#   https://resume.samstuhl.com/api/auth/google/callback
+# DEV_USER_EMAIL must NEVER be set here (it bypasses auth; local dev only).
+secrets = ["DATABASE_URL", "SESSION_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]
 
 [app]
 name = "resume-manager"
@@ -29,11 +30,11 @@ cpus = 1.0
 
 [env]
 # Non-secret runtime config.
+APP_BASE_URL = "https://resume.samstuhl.com"   # public origin: OAuth redirect + Secure cookies
 # DEFAULT_MODEL = "claude-sonnet-5"
 #
-# Open-signup guardrails (all optional; unset = unlimited / off):
-# REQUIRE_ACCESS_JWT = "1"        # fail-closed auth; strongly recommended when public
-# MAX_USERS = "50"                # cap distinct accounts (protects the Neon free tier)
+# Signup / resource guardrails (all optional; unset = unlimited / off):
+# MAX_USERS = "50"                # cap distinct accounts (protects the DB)
 # MAX_VERSIONS_PER_USER = "200"   # per-user version cap; commits rejected at the cap
 # COMPILE_RATE_PER_MIN = "30"     # per-user PDF-compile budget
 # CHAT_RATE_PER_MIN = "30"        # per-user assistant-request budget

@@ -89,6 +89,7 @@ export const api = {
   saveApiKey: (api_key: string) =>
     req("/api/settings/api-key", { method: "PUT", body: JSON.stringify({ api_key }) }),
   deleteAccount: () => req<{ ok: boolean }>("/api/account", { method: "DELETE" }),
+  logout: () => req<{ ok: boolean }>("/api/auth/logout", { method: "POST" }),
 
   versions: () => req<VersionMeta[]>("/api/versions"),
   version: (v: number) => req<VersionDetail>(`/api/versions/${v}`),
@@ -184,6 +185,5 @@ export const pdfUrl = {
   version: (v: number) => `/api/versions/${v}/pdf`,
 };
 
-// Cloudflare Access clears its session cookie at this path on the app's own
-// domain. No backend route needed. Only meaningful when Me.behind_access is true.
-export const LOGOUT_URL = "/cdn-cgi/access/logout";
+// Kicks off Google sign-in (server redirects to Google's consent screen).
+export const GOOGLE_LOGIN_URL = "/api/auth/google/login";
