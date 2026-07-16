@@ -28,6 +28,11 @@ Compare any two versions as a PR-style diff before you commit:
 
 ![PR-style JSON diff between two resume versions](docs/img/compare.png)
 
+The Resume Assistant, in-app (with a Claude key) or copy-paste (any AI chat), with
+per-task skills (ask / ATS / tailor / base-update):
+
+<img src="docs/img/assistant.png" alt="Resume Assistant copy-paste mode with the set-up-a-chat flow and skill picker" width="620">
+
 ## Two kinds of changes
 
 - **Base updates**: facts about your life change (new role, new school,
