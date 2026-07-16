@@ -82,13 +82,13 @@ Run the tests with `pytest` (the PDF test auto-skips if `pdflatex` is absent).
 1. Create a Postgres project (Neon); note the connection string.
 2. Create a **Google OAuth 2.0 Web client** (Google Cloud console → APIs & Services
    → Credentials). Add the authorized redirect URI
-   `https://resume.samstuhl.com/api/auth/google/callback`. Note the client id + secret.
+   `https://resume.kosmoskit.com/api/auth/google/callback`. Note the client id + secret.
 3. Register the project in the console and set the secrets:
    - `DATABASE_URL` — the Postgres connection string.
    - `SESSION_SECRET` — a random 32+ byte string signing the session cookie
      (`openssl rand -base64 48`).
    - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — from step 2.
-   And the env (non-secret): `APP_BASE_URL=https://resume.samstuhl.com` (builds the
+   And the env (non-secret): `APP_BASE_URL=https://resume.kosmoskit.com` (builds the
    redirect URI and enables Secure cookies). Optional guardrails: `MAX_USERS`,
    `MAX_VERSIONS_PER_USER`, `COMPILE_RATE_PER_MIN`, `CHAT_RATE_PER_MIN`. Never set
    `DEV_USER_EMAIL` in production (it bypasses auth).

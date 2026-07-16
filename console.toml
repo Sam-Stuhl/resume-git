@@ -11,13 +11,13 @@
 # The app does its OWN auth now (Cloudflare Access is gone): users sign in with
 # Google and get a signed session cookie. In the Google Cloud console create an
 # OAuth 2.0 Web client and add this authorized redirect URI:
-#   https://resume.samstuhl.com/api/auth/google/callback
+#   https://resume.kosmoskit.com/api/auth/google/callback
 # DEV_USER_EMAIL must NEVER be set here (it bypasses auth; local dev only).
 secrets = ["DATABASE_URL", "SESSION_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]
 
 [app]
 name = "resume-manager"
-subdomain = "resume"       # serves at resume.samstuhl.com
+subdomain = "resume"       # serves at resume.kosmoskit.com
 port = 8080
 
 [health]
@@ -30,7 +30,7 @@ cpus = 1.0
 
 [env]
 # Non-secret runtime config.
-APP_BASE_URL = "https://resume.samstuhl.com"   # public origin: OAuth redirect + Secure cookies
+APP_BASE_URL = "https://resume.kosmoskit.com"   # public origin: OAuth redirect + Secure cookies
 # DEFAULT_MODEL = "claude-sonnet-5"
 #
 # Signup / resource guardrails (all optional; unset = unlimited / off):

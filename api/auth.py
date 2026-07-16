@@ -38,7 +38,9 @@ from db.session import get_session
 
 router = APIRouter(prefix="/api/auth")
 
-APP_BASE_URL = os.environ.get("APP_BASE_URL", "https://resume.samstuhl.com").rstrip("/")
+# The public origin is env-driven (set APP_BASE_URL in console.toml for prod). The
+# default is a local-dev fallback only: http:// keeps Secure cookies off for localhost.
+APP_BASE_URL = os.environ.get("APP_BASE_URL", "http://localhost:8080").rstrip("/")
 SESSION_SECRET = os.environ.get("SESSION_SECRET") or "dev-insecure-session-secret-change-me"
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
