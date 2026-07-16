@@ -3,6 +3,31 @@
 
 type P = { size?: number; className?: string };
 
+// The app's brand mark: a resume document. Stroke uses currentColor, so it
+// themes to whatever text color it sits in.
+export function ResumeMark({ size = 16, className }: P) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 48 48"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <rect x="13" y="8" width="22" height="32" rx="3" />
+      <circle cx="24" cy="18" r="3.2" />
+      <path d="M19 26c1.6-3.2 8.4-3.2 10 0" />
+      <line x1="19" y1="32" x2="29" y2="32" />
+      <line x1="19" y1="36" x2="26" y2="36" />
+    </svg>
+  );
+}
+
 export function GitBranchIcon({ size = 16, className }: P) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="currentColor" className={className} aria-hidden="true">

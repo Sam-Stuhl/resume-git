@@ -13,7 +13,7 @@ import { OnboardingWizard } from "./components/OnboardingWizard";
 import { UserMenu } from "./components/UserMenu";
 import { Tour } from "./components/Tour";
 import { AuthScreen } from "./components/AuthScreen";
-import { GitBranchIcon, MenuIcon } from "./components/icons";
+import { GitBranchIcon, MenuIcon, ResumeMark } from "./components/icons";
 import { branchName, ref } from "./lib/git";
 import { prefs } from "./lib/prefs";
 
@@ -137,7 +137,7 @@ export default function App() {
         <button className="icon-btn" title="Toggle history" onClick={() => setRailOpen((o) => !o)}>
           <MenuIcon size={16} />
         </button>
-        <span className="wordmark"><GitBranchIcon size={16} className="wm-ico" /> resume-git</span>
+        <span className="wordmark"><ResumeMark size={16} className="wm-ico" /> resume-git</span>
         <span className={"branch-pill " + (onMain ? "on-main" : "on-branch")}>
           <GitBranchIcon size={12} /> {headMeta ? branchName(headMeta) : "main"}
         </span>
