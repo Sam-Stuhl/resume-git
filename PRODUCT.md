@@ -2,22 +2,22 @@
 
 ## Register
 
-**Product** (design serves the product). resume-git is a tool: an authenticated app where the user is in a task — versioning, tailoring, and compiling a résumé. It is not a marketing surface. The bar is *earned familiarity*: someone fluent in Git, GitHub, and Claude should sit down and trust it immediately.
+**Product** (design serves the product). resume-git is a tool: an authenticated app where the user is in a task, editing and compiling a résumé with an AI. It now has a public **landing page**, which is a genuine marketing surface that introduces the product to newcomers; the app behind it stays a focused workspace, not a marketing dashboard. It assumes no prior context: someone new should get it in about a minute, and someone fluent in Git and AI chat should trust it immediately.
 
 ## What it is
 
-Version control for a résumé. One canonical résumé is the source of truth; the app applies the Git mental model to it — **commits** (immutable versions), **branches** (job-tailored forks off the base line), **diffs**, **checkout/restore**, and a **network graph** of history. JSON is the source of truth; a Jake's-Résumé LaTeX template compiles it to a PDF on demand. A curated, streaming **Claude assistant** (git-aware: it can read history and propose changes / structural actions with confirmation) helps advise, tailor, ATS-audit, and update the baseline.
+**An AI edits your résumé; version control keeps every version.** You ask in plain English and the AI tailors, tightens, or updates your résumé for you. The résumé is stored as structured **JSON**, which is what lets the AI make precise, reviewable, reversible edits: every change is a diff you approve, on a version you can restore, with your original never overwritten. A single-page LaTeX template compiles the JSON to a PDF on demand. Under the hood the app uses a Git-style model (immutable versions, branches for job-tailored copies, diffs, checkout/restore, a network graph of history); outward-facing copy leans on plain version-control language rather than Git jargon. Two ways to run the AI: the in-app **Claude assistant** (git-aware, reads history and proposes changes with confirmation, powered by a connected API key or OAuth token), or a keyless **copy-paste** path that works with any AI chat.
 
 ## Users & purpose
 
-- **Who:** the owner plus a small, closed circle of friends — developer-literate, comfortable with Git. Not built to scale to strangers.
+- **Who:** anyone, with a genuine target of CS and early-career software applicants (the output is the canonical single-page CS/SWE LaTeX résumé). Git literacy is a tailwind, not a requirement: the app teaches the model as you go, and non-technical users can rely entirely on the AI.
 - **Context:** preparing and tailoring résumés for specific job applications, iterating over time without losing history.
-- **Job to be done:** keep one strong baseline, branch/tailor per job, review the diff, compile to PDF, and get honest AI help — all non-destructively.
-- **Primary task per screen:** the Edit workbench (edit → live PDF preview → commit) is the center of gravity; history/compare/network are for orientation and review.
+- **Job to be done:** keep one strong résumé, let the AI tailor a copy per job, review the change, compile to PDF, all non-destructively.
+- **Primary task per screen:** the Edit workbench (edit, live PDF preview, commit) with the AI assistant alongside is the center of gravity; history/compare/network are for orientation and review.
 
 ## Brand personality
 
-**A deliberate blend of GitHub and Claude:** GitHub's *structure* (repo/branches/commits, neutral developer palette, git vocabulary) carried with Claude's *calm* (restraint, generous space, content over chrome, prose over boxes). Precise, quiet, trustworthy — a serious developer tool that never shouts.
+**A deliberate blend of GitHub and Claude:** GitHub's *structure* (repo/branches/commits, neutral developer palette, git vocabulary) carried with Claude's *calm* (restraint, generous space, content over chrome, prose over boxes). Precise, quiet, trustworthy: a serious developer tool that never shouts.
 
 The living reference for the feel is the app itself as it stands, especially the redesigned assistant panel (assistant replies as prose, quiet neutral user bubbles, one composer, flat reviewable proposals).
 
