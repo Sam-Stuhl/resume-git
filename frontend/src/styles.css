@@ -642,9 +642,9 @@ textarea.raw { width: 100%; min-height: 60vh; }
 .landing-page .prop .prow .sect { color: var(--muted); font-family: var(--mono); font-size: 12px; }
 .landing-page .diff { margin-top: 11px; font-family: var(--mono); font-size: 12px; line-height: 1.65; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
 .landing-page .diff .l { padding: 2px 11px; white-space: pre-wrap; }
-.landing-page .diff .del { background: var(--del-bg); }
+.landing-page .diff .del { background: var(--del-bg); color: var(--text); }
 .landing-page .diff .del::before { content: "\2212\00A0"; color: var(--del); }
-.landing-page .diff .add { background: var(--add-bg); }
+.landing-page .diff .add { background: var(--add-bg); color: var(--text); }
 .landing-page .diff .add::before { content: "+ "; color: var(--add); }
 .landing-page .a-actions { display: flex; gap: 8px; margin-top: 13px; align-items: center; }
 .landing-page .a-actions .note { margin-left: 2px; font-size: 11.5px; color: var(--faint); }
