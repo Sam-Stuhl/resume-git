@@ -125,7 +125,7 @@ export default function App() {
 
   if (needAuth) {
     const failed = new URLSearchParams(window.location.search).get("auth") === "failed";
-    return failed ? <AuthScreen failed /> : <Landing />;
+    return failed ? <AuthScreen /> : <Landing />;
   }
   if (fatal) return <div style={{ padding: 24 }} className="err">{fatal}</div>;
 

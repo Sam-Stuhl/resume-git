@@ -1,21 +1,21 @@
 import { GOOGLE_LOGIN_URL } from "../api";
 import { GitBranchIcon } from "./icons";
 
-/** Pre-auth landing: shown when there's no session. Sign-in is Google OAuth,
- * handled server-side (the button just navigates to the login route). */
-export function AuthScreen({ failed }: { failed?: boolean }) {
+/** Failed-sign-in fallback: shown only when a Google OAuth attempt didn't
+ * complete (the "?auth=failed" redirect). The normal logged-out entry point
+ * is the Landing page; sign-in itself is Google OAuth, handled server-side
+ * (the button just navigates to the login route). */
+export function AuthScreen() {
   return (
     <div className="auth-screen">
       <div className="auth-card">
         <h1 className="auth-title"><GitBranchIcon size={22} /> resume-git</h1>
-        <p className="auth-lead">
-          Version control for your résumé: commit versions, branch to tailor for a job,
-          diff, and compile to a PDF. Sign in to get started.
+        <p className="err" style={{ margin: "0 auto 22px", maxWidth: "34ch" }}>
+          Sign-in didn't complete. Please try again.
         </p>
         <a className="auth-google" href={GOOGLE_LOGIN_URL}>
           <GoogleG /> Continue with Google
         </a>
-        {failed && <p className="err" style={{ marginTop: 12 }}>Sign-in didn't complete. Please try again.</p>}
         <p className="muted auth-fine">
           We only use your Google account to identify you. Your résumé data stays private to your account.
         </p>
