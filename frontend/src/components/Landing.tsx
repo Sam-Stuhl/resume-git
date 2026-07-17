@@ -46,9 +46,9 @@ export function Landing(): JSX.Element {
                   <div className="l del">Built internal tools with Python and Flask</div>
                   <div className="l add">Shipped distributed data pipelines in Go and Kafka</div>
                 </div>
-                <div className="a-actions">
-                  <button type="button" className="btn green sm">Approve</button>
-                  <button type="button" className="btn sm">Discard</button>
+                <div className="a-actions" aria-hidden="true">
+                  <button type="button" tabIndex={-1} className="btn green sm">Approve</button>
+                  <button type="button" tabIndex={-1} className="btn sm">Discard</button>
                   <span className="note">Nothing is saved until you approve.</span>
                 </div>
               </div>
@@ -145,7 +145,7 @@ export function Landing(): JSX.Element {
             resume-git
           </span>
           <span className="spacer" />
-          <a href="#">GitHub</a>
+          <a href="https://github.com/Sam-Stuhl/resume-git" target="_blank" rel="noopener noreferrer">GitHub</a>
           <span>AI edits every version of your résumé.</span>
         </div>
       </footer>
