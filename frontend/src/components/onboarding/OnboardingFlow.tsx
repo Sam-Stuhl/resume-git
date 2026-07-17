@@ -237,7 +237,7 @@ export function OnboardingFlow({
               onChange={(e) => setCredKey(e.target.value)}
               placeholder={ai === "pro" ? "sk-ant-oat..." : "sk-ant-api..."}
               autoComplete="off"
-              onKeyDown={(e) => { if (e.key === "Enter") connect(); }}
+              onKeyDown={(e) => { if (e.key === "Enter" && !credBusy) connect(); }}
             />
             <div className="row">
               <button className="green" disabled={credBusy || !credKey.trim()} onClick={connect}>

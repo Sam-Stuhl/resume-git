@@ -215,6 +215,7 @@ export default function App() {
                   onCommitted={onCommitted}
                   onMeChanged={async () => setMe(await api.me())}
                   initialChatInput={pendingChatPrompt ?? undefined}
+                  onInitialChatInputConsumed={() => setPendingChatPrompt(null)}
                 />
               </div>
             ) : (
