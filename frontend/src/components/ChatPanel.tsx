@@ -46,7 +46,7 @@ function suggestedName(p: ChatProposal): string {
  * turn renders in the order it happened.
  */
 export function ChatPanel({
-  threadKey, me, currentData, onApply, onCreateBranch, onRepoChanged, onMeChanged,
+  threadKey, me, currentData, onApply, onCreateBranch, onRepoChanged, onMeChanged, initialInput,
 }: {
   threadKey: string;
   me: Me;
@@ -55,6 +55,7 @@ export function ChatPanel({
   onCreateBranch: (data: Resume, label: string, jd: string | null) => Promise<void>;
   onRepoChanged: (v?: number) => void;
   onMeChanged: () => void | Promise<void>;
+  initialInput?: string;
 }) {
   // Which assistant to show: the streaming in-app agent or the copy-paste flow.
   // Default by credential the first time, then remember the user's choice.
@@ -74,6 +75,14 @@ export function ChatPanel({
 
   useEffect(() => {
     api.skills().then(setSkills).catch(() => {});
+  }, []);
+
+  // Seed the composer once on mount when a caller (the onboarding handoff)
+  // hands us a preloaded message; deliberately mount-only, so typing in the
+  // box afterward doesn't get clobbered by this prop changing.
+  useEffect(() => {
+    if (initialInput) setInput(initialInput);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

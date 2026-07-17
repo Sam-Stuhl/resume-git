@@ -12,8 +12,9 @@ import { ChatIcon, ChevronRightIcon, DocIcon, GitBranchIcon, KeyIcon, SparkIcon 
  * Q1 asks whether the user already has a résumé (or lets them skip straight
  * to a blank editor). Q2 asks how they want to power the AI assistant, and
  * routes to either the connect screen (Claude Pro/Max or an API key) or the
- * copy-paste screen (no key, any AI chat). This task implements Q1, Q2, and
- * the keyless copy-paste route; connect is a placeholder for Task 8.
+ * copy-paste screen (no key, any AI chat). The connect screen saves the
+ * credential, then hands off to the in-app assistant chat with the composer
+ * preloaded via onOpenAssistant.
  */
 
 type Ai = "pro" | "api" | "none";
@@ -43,11 +44,10 @@ export function OnboardingFlow({
   const [cpCopied, setCpCopied] = useState(false);
   const [cpErr, setCpErr] = useState("");
 
-  // onOpenAssistant isn't called by this task's placeholder connect screen;
-  // Task 8 wires it in once that screen gets a real body. Referencing it
-  // here keeps the interface stable and satisfies noUnusedParameters in the
-  // meantime.
-  void onOpenAssistant;
+  // Connect route state (Claude Pro/Max setup-token or an Anthropic API key).
+  const [credKey, setCredKey] = useState("");
+  const [credBusy, setCredBusy] = useState(false);
+  const [credErr, setCredErr] = useState("");
 
   const screen: Screen =
     has === null ? "q1"
@@ -121,6 +121,28 @@ export function OnboardingFlow({
   }
   function backToQ2() {
     setAi(null);
+    setCredKey("");
+    setCredErr("");
+  }
+
+  // The message the assistant chat opens with: a convert prompt (paste your
+  // résumé) if the user already has one, otherwise a build prompt (kick off
+  // the question-by-question build).
+  const preloadText = has
+    ? "Here's my résumé:\n\n[paste your résumé here]"
+    : "Yes, let's start. Ask me your first question.";
+
+  async function connect() {
+    if (!credKey.trim()) return;
+    setCredBusy(true);
+    setCredErr("");
+    try {
+      await api.saveApiKey(credKey.trim());
+      onOpenAssistant(preloadText);
+    } catch (e) {
+      setCredErr(String((e as ApiError).message || e));
+      setCredBusy(false);
+    }
   }
 
   const crumbs = has !== null && (
@@ -198,14 +220,33 @@ export function OnboardingFlow({
         )}
 
         {screen === "connect" && (
-          // TODO(Task 8): connect + preloaded chat. Real screen collects a
-          // claude setup-token (pro) or sk-ant-api key (api), saves it, then
-          // calls onOpenAssistant(initialInput) to hand off to a preloaded chat.
           <div className="onb-step">
             {crumbs}
             <h1 className="t">{ai === "pro" ? "Connect your Claude subscription" : "Connect your API key"}</h1>
-            <p className="lead">Placeholder: implemented in a later task.</p>
-            <div className="back"><button className="linklike" onClick={backToQ2}>← Back</button></div>
+            <p className="lead">
+              {ai === "pro" ? (
+                <>Run <code>claude setup-token</code> in your terminal and paste the token it prints. It starts with <code>sk-ant-oat</code> and bills your Claude subscription.</>
+              ) : (
+                <>Paste a key from console.anthropic.com. It starts with <code>sk-ant-api</code> and bills API credits.</>
+              )}
+            </p>
+            <label className="onb-field-label">{ai === "pro" ? "Login token" : "API key"}</label>
+            <input
+              type="password"
+              value={credKey}
+              onChange={(e) => setCredKey(e.target.value)}
+              placeholder={ai === "pro" ? "sk-ant-oat..." : "sk-ant-api..."}
+              autoComplete="off"
+              onKeyDown={(e) => { if (e.key === "Enter") connect(); }}
+            />
+            <div className="row">
+              <button className="green" disabled={credBusy || !credKey.trim()} onClick={connect}>
+                {credBusy ? "Connecting…" : "Connect and open the assistant"}
+              </button>
+              <button className="linklike" onClick={backToQ2}>← Back</button>
+            </div>
+            {credErr && <p className="err" style={{ marginTop: 10 }}>{credErr}</p>}
+            <p className="onb-hint">Saved to your account and never shown again.</p>
           </div>
         )}
 

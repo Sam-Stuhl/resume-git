@@ -66,6 +66,7 @@ export default function App() {
   const [needAuth, setNeedAuth] = useState(false);
   const [wizardDismissed, setWizardDismissed] = useState(false);
   const [tourActive, setTourActive] = useState(false);
+  const [pendingChatPrompt, setPendingChatPrompt] = useState<string | null>(null);
   const { theme, setTheme } = useTheme();
 
   const startTour = useCallback(() => { setView("edit"); setTourActive(true); }, []);
@@ -118,6 +119,16 @@ export default function App() {
   const onCommitted = async (v?: number) => {
     await refresh(v);
     setMe(await api.me());
+  };
+
+  // Onboarding connect hand-off: refetch `me` so the just-saved credential
+  // enables the agent chat, dismiss the wizard so it doesn't re-trigger on
+  // this still-empty account, and open Edit with the composer preloaded.
+  const onOpenAssistant = async (initialInput: string) => {
+    setMe(await api.me());
+    setWizardDismissed(true);
+    setPendingChatPrompt(initialInput);
+    setView("edit");
   };
 
   const checkout = async () => {
@@ -194,11 +205,17 @@ export default function App() {
               <OnboardingFlow
                 onFinish={async (v) => { setWizardDismissed(true); await onCommitted(v); }}
                 onStartBlank={() => setWizardDismissed(true)}
-                onOpenAssistant={() => setWizardDismissed(true)} // TODO(Task 8): open assistant preloaded with initialInput
+                onOpenAssistant={onOpenAssistant}
               />
             ) : editDetail ? (
               <div className="edit-fill">
-                <Workbench detail={editDetail} me={me} onCommitted={onCommitted} onMeChanged={async () => setMe(await api.me())} />
+                <Workbench
+                  detail={editDetail}
+                  me={me}
+                  onCommitted={onCommitted}
+                  onMeChanged={async () => setMe(await api.me())}
+                  initialChatInput={pendingChatPrompt ?? undefined}
+                />
               </div>
             ) : (
               <div className="content"><p className="muted">Loading…</p></div>
