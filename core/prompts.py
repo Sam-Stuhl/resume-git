@@ -71,6 +71,67 @@ Convert the resume I provided in this chat. Return ONLY the JSON, starting with 
 """
 
 
+ONBOARDING_BUILD_PROMPT = """\
+You are helping me build a structured JSON representation of my resume that will be used by resume-git, a résumé version-control app. This is a one-time onboarding step. I do not have an existing resume to give you.
+
+Interview me instead. Ask about one topic at a time (education, then work or internship experience, then projects, then leadership, then skills), with short specific follow-up questions, including for measurable numbers (percentages, user counts, team sizes, performance improvements). Do not invent or assume anything I have not told you. When we have covered enough ground, convert what I told you into the exact JSON schema specified below, then return ONLY that JSON. No explanation, no commentary, no markdown code fences. Start your response with `{` and end with `}`.
+
+REQUIRED SCHEMA:
+
+{
+  "personal": {
+    "name":     "Full Name",
+    "email":    "email@example.com",
+    "phone":    "(123) 456-7890",
+    "github":   "github.com/username",
+    "linkedin": "linkedin.com/in/username"
+  },
+  "summary": "A 2-3 sentence professional summary.",
+  "experience": [
+    {
+      "title":        "Job Title",
+      "organization": "Company Name",
+      "location":     "City, State or Remote",
+      "start_date":   "Mon YYYY",
+      "end_date":     "Mon YYYY or Present",
+      "bullets": ["Action verb + what you did + tech used + impact if measurable."]
+    }
+  ],
+  "projects":   [ { "name": "...", "stack": "...", "bullets": ["..."] } ],
+  "leadership": [ { "title": "...", "organization": "...", "location": "...", "start_date": "...", "end_date": "...", "bullets": ["..."] } ],
+  "skills": {
+    "Languages":              "Comma-separated programming languages",
+    "Frameworks & Libraries": "Comma-separated frameworks",
+    "Cloud & Data":           "Comma-separated cloud and data tools",
+    "Developer Tools":        "Comma-separated dev tools"
+  },
+  "education": [ { "school": "...", "location": "...", "gpa": "X.XX or empty", "start_date": "...", "end_date": "...", "coursework": "Comma-separated courses" } ]
+}
+
+CONVERSION RULES (informed by 2026 ATS and AI screener behavior):
+
+1. **Faithful conversion only.** Do NOT invent or embellish. If a field is missing in the source, use empty string or empty array. Never guess.
+
+2. **Acronym handling.** Modern ATS may match either the spelled-out form OR the acronym, not both. Best practice: spell out on first use AND include the acronym in parentheses. "Machine Learning (ML)", "Large Language Model (LLM)", "Command Line Interface (CLI)", "Amazon Web Services (AWS)". This way exact-match searches for either form will hit.
+
+3. **Strong bullets.** Convert each bullet to: action verb + what you did + technologies used + measurable impact. Always include the exact technology names from the source (not generic terms) so they're available for keyword matching. Good action verbs: Built, Engineered, Designed, Migrated, Led, Implemented, Automated, Developed, Architected, Shipped, Optimized.
+
+4. **Preserve numbers ruthlessly.** Any specific number in the source (percentages, user counts, dataset sizes, team sizes, performance improvements) is gold: AI ranking systems weight measurable evidence heavily. Keep every number. Never invent numbers if they aren't in the source.
+
+5. **Character cleanup.** Replace em-dashes with semicolons or hyphens. Replace arrows with the word 'to'. Use straight quotes only. Avoid characters that might trip a LaTeX compiler or ATS parser.
+
+6. **Empty sections.** If a section is missing in the source, return that key with an empty array. Do not omit top-level keys: resume-git requires the full schema.
+
+7. **Skills categorization.** Group skills into the four categories shown. If the source lists skills in one block, split them by type. Include the exact technology names as they appear in the source. Omit a category key only if there is nothing to put in it.
+
+8. **Section presence guidance for student / early-career.** If the user lists relevant coursework, certifications, competitions, or honors, preserve them: these are strong signals for early-career candidates. They can go in the education entry's coursework field or in the leadership section.
+
+9. **Include everything from the source for now.** The user will trim later with the tailoring tool. Better to have too much in the baseline than to lose information.
+
+Interview me now, one topic at a time. Return ONLY the JSON, starting with { and ending with }.
+"""
+
+
 SESSION_PROMPT_TEMPLATE = """\
 You are my dedicated resume advisor for an ongoing chat session. Across this chat, I will send you four kinds of requests, identified by a tag at the start of each message:
 

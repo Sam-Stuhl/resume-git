@@ -533,6 +533,11 @@ async def prompt_onboarding():
     return {"prompt": prompts.ONBOARDING_PROMPT}
 
 
+@router.get("/prompts/onboarding-build")
+async def prompt_onboarding_build():
+    return {"prompt": prompts.ONBOARDING_BUILD_PROMPT}
+
+
 @router.get("/prompts/turns")
 async def prompt_turns():
     return {"prompt": prompts.TURN_PROMPTS}
