@@ -114,6 +114,7 @@ export const api = {
 
   sessionPrompt: () => req<{ prompt: string }>("/api/prompts/session"),
   onboardingPrompt: () => req<{ prompt: string }>("/api/prompts/onboarding"),
+  onboardingBuildPrompt: () => req<{ prompt: string }>("/api/prompts/onboarding-build"),
   // Full, ready-to-paste prompt for one keyless intent (JD/note injected).
   copyPrompt: (body: { intent: string; jd_text?: string; note?: string }) =>
     req<{ prompt: string }>("/api/prompts/copy", { method: "POST", body: JSON.stringify(body) }),
