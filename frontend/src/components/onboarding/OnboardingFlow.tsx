@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { api, ApiError } from "../../api";
+import type { TailorPreview } from "../../types";
+import { DiffLines, Summary } from "../DiffView";
 import { ChatIcon, ChevronRightIcon, DocIcon, GitBranchIcon, KeyIcon, SparkIcon } from "../icons";
 
 /**
@@ -9,8 +12,8 @@ import { ChatIcon, ChevronRightIcon, DocIcon, GitBranchIcon, KeyIcon, SparkIcon 
  * Q1 asks whether the user already has a résumé (or lets them skip straight
  * to a blank editor). Q2 asks how they want to power the AI assistant, and
  * routes to either the connect screen (Claude Pro/Max or an API key) or the
- * copy-paste screen (no key, any AI chat). This task implements Q1 and Q2
- * fully; connect and copy-paste are placeholders for Tasks 8 and 7.
+ * copy-paste screen (no key, any AI chat). This task implements Q1, Q2, and
+ * the keyless copy-paste route; connect is a placeholder for Task 8.
  */
 
 type Ai = "pro" | "api" | "none";
@@ -32,11 +35,18 @@ export function OnboardingFlow({
   const [has, setHas] = useState<boolean | null>(null);
   const [ai, setAi] = useState<Ai | null>(null);
 
-  // onFinish and onOpenAssistant aren't called by this task's placeholder
-  // connect/copy-paste screens; Tasks 7 and 8 wire them in when those screens
-  // get real bodies. Referencing them here keeps the interface stable and
-  // satisfies noUnusedParameters in the meantime.
-  void onFinish;
+  // Keyless copy-paste route state (convert if has, build if !has).
+  const [cpPrompt, setCpPrompt] = useState("");
+  const [cpPasted, setCpPasted] = useState("");
+  const [cpPreview, setCpPreview] = useState<TailorPreview | null>(null);
+  const [cpBusy, setCpBusy] = useState(false);
+  const [cpCopied, setCpCopied] = useState(false);
+  const [cpErr, setCpErr] = useState("");
+
+  // onOpenAssistant isn't called by this task's placeholder connect screen;
+  // Task 8 wires it in once that screen gets a real body. Referencing it
+  // here keeps the interface stable and satisfies noUnusedParameters in the
+  // meantime.
   void onOpenAssistant;
 
   const screen: Screen =
@@ -44,6 +54,62 @@ export function OnboardingFlow({
     : ai === null ? "q2"
     : ai === "none" ? "copypaste"
     : "connect";
+
+  function resetCopyPaste() {
+    setCpPrompt(""); setCpPasted(""); setCpPreview(null);
+    setCpBusy(false); setCpCopied(false); setCpErr("");
+  }
+
+  // Fetch the ready-to-copy prompt as soon as the copy-paste route is shown;
+  // convert (has a résumé) vs build (starting fresh) get different prompts.
+  useEffect(() => {
+    if (screen !== "copypaste") return;
+    let cancelled = false;
+    resetCopyPaste();
+    const call = has ? api.onboardingPrompt() : api.onboardingBuildPrompt();
+    call
+      .then((r) => { if (!cancelled) setCpPrompt(r.prompt); })
+      .catch((e) => { if (!cancelled) setCpErr(String((e as ApiError).message)); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, has]);
+
+  async function copyCpPrompt() {
+    await navigator.clipboard.writeText(cpPrompt);
+    setCpCopied(true);
+    setTimeout(() => setCpCopied(false), 1500);
+  }
+
+  async function reviewPaste() {
+    setCpBusy(true); setCpErr("");
+    try {
+      setCpPreview(await api.pastePreview(cpPasted, "base-update"));
+    } catch (e) {
+      const d: any = (e as ApiError).detail;
+      setCpErr(
+        d?.problems ? "That JSON isn't a valid résumé:\n- " + d.problems.join("\n- ")
+        : "Couldn't read JSON from that paste. Copy the AI's reply again; it should be one JSON object."
+      );
+    } finally { setCpBusy(false); }
+  }
+
+  async function useAsResume() {
+    if (!cpPreview) return;
+    setCpBusy(true); setCpErr("");
+    try {
+      const created = await api.createBase(cpPreview.data, "Base");
+      onFinish(created.version);
+    } catch (e) {
+      const d: any = (e as ApiError).detail;
+      setCpErr(d?.problems ? "Schema problems:\n- " + d.problems.join("\n- ") : String((e as Error).message));
+      setCpBusy(false);
+    }
+  }
+
+  function discardPaste() {
+    setCpPreview(null);
+    setCpPasted("");
+  }
 
   function chooseHas(v: boolean) {
     setHas(v);
@@ -144,13 +210,68 @@ export function OnboardingFlow({
         )}
 
         {screen === "copypaste" && (
-          // TODO(Task 7): copy-paste route. Real screen shows the ready-to-copy
-          // prompt (via api.onboardingPrompt) and a paste-back box that calls
-          // onFinish(createdVersion) once the AI's reply is reviewed and saved.
           <div className="onb-step">
             {crumbs}
             <h1 className="t">Copy this into any AI chat</h1>
-            <p className="lead">Placeholder: implemented in a later task.</p>
+            <p className="lead">
+              {has ? (
+                <>Paste the prompt into any AI chat, <strong>attach your résumé</strong> (any file your AI accepts), and send. Then paste the AI's reply back here.</>
+              ) : (
+                "Paste the prompt into any AI chat, answer its questions, then paste its reply back here."
+              )}
+            </p>
+
+            {cpPrompt ? (
+              <div className="onb-pbox">
+                <div className="onb-pbox-head">
+                  Prompt
+                  <button className="onb-pbox-copy" onClick={copyCpPrompt}>{cpCopied ? "Copied ✓" : "Copy"}</button>
+                </div>
+                <div className="onb-pbox-body">
+                  <textarea rows={7} readOnly value={cpPrompt} />
+                </div>
+              </div>
+            ) : (
+              !cpErr && <p className="muted" style={{ fontSize: 13, marginTop: 16 }}>Preparing the prompt…</p>
+            )}
+
+            {cpPrompt && !cpPreview && (
+              <>
+                <label className="onb-field-label">Paste the AI's reply here</label>
+                <textarea
+                  rows={4}
+                  value={cpPasted}
+                  onChange={(e) => setCpPasted(e.target.value)}
+                  placeholder="Paste whatever the AI sent back"
+                />
+                <p className="onb-hint">
+                  Paste the whole reply, even if it looks like code. We'll turn it into a clean résumé and show you a friendly summary before anything is saved.
+                </p>
+                <div className="row">
+                  <button className="accent" disabled={cpBusy || !cpPasted.trim()} onClick={reviewPaste}>
+                    {cpBusy ? "Reading…" : "Review"}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {cpPreview && (
+              <div className="card" style={{ marginTop: 16 }}>
+                <p className="section-title">Your résumé</p>
+                <Summary items={cpPreview.summary} />
+                <details>
+                  <summary className="muted" style={{ cursor: "pointer" }}>Line-by-line</summary>
+                  <DiffLines lines={cpPreview.diff} />
+                </details>
+                <div className="row" style={{ marginTop: 12 }}>
+                  <button className="green" disabled={cpBusy} onClick={useAsResume}>Use as my résumé</button>
+                  <button disabled={cpBusy} onClick={discardPaste}>Discard</button>
+                </div>
+              </div>
+            )}
+
+            {cpErr && <p className="err" style={{ marginTop: 10 }}>{cpErr}</p>}
+
             <div className="back"><button className="linklike" onClick={backToQ2}>← Back</button></div>
           </div>
         )}

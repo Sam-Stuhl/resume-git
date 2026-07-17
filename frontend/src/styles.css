@@ -770,3 +770,14 @@ textarea.raw { width: 100%; min-height: 60vh; }
 .onb-flow .linklike:hover { color: var(--text); }
 .onb-flow .manual { margin-top: 14px; display: inline-block; }
 .onb-flow .back { margin-top: 18px; }
+
+/* Copy-paste route: read-only prompt box + paste-back field. */
+.onb-flow .onb-pbox { margin-top: 16px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.onb-flow .onb-pbox-head {
+  display: flex; align-items: center; gap: 8px; padding: 9px 13px; background: var(--panel-2);
+  border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 650; color: var(--muted);
+}
+.onb-flow .onb-pbox-copy { margin-left: auto; padding: 4px 11px; font-size: 12px; }
+.onb-flow .onb-pbox-body { padding: 12px; }
+.onb-flow .onb-field-label { display: block; font-size: 12px; color: var(--muted); margin: 16px 0 6px; }
+.onb-flow .onb-hint { font-size: 12.5px; color: var(--muted); margin-top: 10px; line-height: 1.5; }
