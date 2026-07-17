@@ -9,7 +9,10 @@ import { Compare } from "./components/Compare";
 import { NetworkGraph } from "./components/NetworkGraph";
 import { CommitModal } from "./components/CommitModal";
 import { Settings } from "./components/Settings";
-import { OnboardingWizard } from "./components/OnboardingWizard";
+// OnboardingWizard.tsx is kept on disk until Task 9 removes it, but its
+// import here is retired now that OnboardingFlow replaces its usage below
+// (an unused import would fail the noUnusedLocals build gate).
+import { OnboardingFlow } from "./components/onboarding/OnboardingFlow";
 import { UserMenu } from "./components/UserMenu";
 import { Tour } from "./components/Tour";
 import { AuthScreen } from "./components/AuthScreen";
@@ -188,9 +191,10 @@ export default function App() {
 
           {view === "edit" ? (
             showWizard ? (
-              <OnboardingWizard
+              <OnboardingFlow
                 onFinish={async (v) => { setWizardDismissed(true); await onCommitted(v); }}
                 onStartBlank={() => setWizardDismissed(true)}
+                onOpenAssistant={() => setWizardDismissed(true)} // TODO(Task 8): open assistant preloaded with initialInput
               />
             ) : editDetail ? (
               <div className="edit-fill">

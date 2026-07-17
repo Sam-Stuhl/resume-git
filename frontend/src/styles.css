@@ -713,3 +713,60 @@ textarea.raw { width: 100%; min-height: 60vh; }
   .landing-page .d2 { animation-delay: .1s; }
   @keyframes landing-rise { to { opacity: 1; transform: none; } }
 }
+
+/* ── Onboarding ── */
+/* New-user funnel (Q1 -> Q2 -> connect/copy-paste) for a brand-new account,
+   ported from the approved onboarding demo. Everything is scoped under
+   .onb-flow so bare class names borrowed straight from the demo (card, opts,
+   opt, crumbs, t, lead, ...) can't leak into the rest of the app; a few of
+   those names (card, row, linklike) are already used unscoped elsewhere, so
+   they're explicitly overridden here rather than renamed, the same pattern
+   .landing-page uses below. No new theme tokens: --shadow is a local,
+   light/dark-aware override the same way .landing-page defines its own. */
+.onb-flow {
+  --shadow: 0 8px 30px rgba(1, 4, 9, .5);
+  display: flex; justify-content: center; align-items: flex-start;
+  padding: 44px 20px 60px; min-height: 100%; box-sizing: border-box; overflow-y: auto;
+}
+@media (prefers-color-scheme: light) {
+  .onb-flow { --shadow: 0 8px 30px rgba(140, 149, 159, .18); }
+}
+:root[data-theme="light"] .onb-flow { --shadow: 0 8px 30px rgba(140, 149, 159, .18); }
+:root[data-theme="dark"] .onb-flow { --shadow: 0 8px 30px rgba(1, 4, 9, .5); }
+
+.onb-flow .card {
+  width: 100%; max-width: 560px; background: var(--panel); border: 1px solid var(--border);
+  border-radius: 16px; box-shadow: var(--shadow); padding: 28px 26px; margin-bottom: 0;
+}
+
+.onb-flow .wm { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: var(--muted); }
+.onb-flow .wm .mk { color: var(--accent); flex: none; }
+
+.onb-flow .crumbs { display: flex; align-items: center; gap: 8px; margin: 14px 0 4px; font-family: var(--mono); font-size: 11px; color: var(--faint); flex-wrap: wrap; }
+.onb-flow .crumbs .c { padding: 2px 9px; border: 1px solid var(--border); border-radius: 999px; }
+.onb-flow .crumbs .c.on { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+
+.onb-flow .t { font-size: 22px; font-weight: 750; letter-spacing: -.01em; margin: 8px 0 0; }
+.onb-flow .lead { margin-top: 10px; color: var(--muted); font-size: 15px; }
+
+.onb-flow .opts { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+.onb-flow .opt {
+  text-align: left; width: 100%; cursor: pointer; background: var(--bg); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px 15px; display: flex; gap: 13px; align-items: flex-start;
+  transition: border-color .12s, background .12s, transform .08s; color: var(--text); font: inherit;
+}
+.onb-flow .opt:hover { border-color: var(--accent); background: var(--panel-2); }
+.onb-flow .opt:active { transform: translateY(1px); }
+.onb-flow .opt .ic {
+  flex: none; width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+  background: var(--panel-2); color: var(--accent); border: 1px solid var(--border); margin-top: 1px;
+}
+.onb-flow .opt .oc { display: flex; flex-direction: column; }
+.onb-flow .opt .oc .ot { display: block; font-size: 15px; font-weight: 650; }
+.onb-flow .opt .oc .od { display: block; font-size: 13px; color: var(--muted); margin-top: 3px; line-height: 1.45; }
+.onb-flow .opt .chev { margin-left: auto; flex: none; align-self: center; color: var(--faint); }
+
+.onb-flow .linklike { color: var(--muted); font-size: 13px; padding: 6px 0; }
+.onb-flow .linklike:hover { color: var(--text); }
+.onb-flow .manual { margin-top: 14px; display: inline-block; }
+.onb-flow .back { margin-top: 18px; }

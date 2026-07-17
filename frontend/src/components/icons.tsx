@@ -75,3 +75,48 @@ export function SignOutIcon({ size = 16, className }: P) {
     </svg>
   );
 }
+
+// Onboarding funnel icons: kept small and stroke/fill-simple so they read
+// well at 16px inside the option cards.
+
+export function DocIcon({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} className={className} aria-hidden="true">
+      <path d="M4 1.75h5L12.5 5.25V14a.5.5 0 0 1-.5.5H4a.5.5 0 0 1-.5-.5V2.25A.5.5 0 0 1 4 1.75Z" />
+      <path d="M8.75 1.75v3.5h3.5" />
+    </svg>
+  );
+}
+
+export function SparkIcon({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M8 1.4 9.5 5l3.6.3-2.7 2.4.8 3.5L8 9.4 4.8 11.2l.8-3.5L2.9 5.3 6.5 5 8 1.4Z" />
+    </svg>
+  );
+}
+
+export function KeyIcon({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} className={className} aria-hidden="true">
+      <circle cx="6" cy="6" r="3.2" />
+      <path d="M8.3 8.3 13 13M11 11l1.4-1.4M9.7 9.7l1.4-1.4" />
+    </svg>
+  );
+}
+
+export function ChatIcon({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} className={className} aria-hidden="true">
+      <path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2v-7Z" />
+    </svg>
+  );
+}
+
+export function ChevronRightIcon({ size = 16, className }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M6 4l4 4-4 4" />
+    </svg>
+  );
+}
