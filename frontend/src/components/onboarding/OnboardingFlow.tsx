@@ -70,14 +70,14 @@ export function OnboardingFlow({
         {screen === "q1" && (
           <div className="onb-step">
             <span className="wm"><GitBranchIcon size={16} className="mk" /> resume-git</span>
-            <h1 className="t">Welcome. Let&rsquo;s set up your résumé.</h1>
+            <h1 className="t">Welcome. Let's set up your résumé.</h1>
             <p className="lead">An AI does the editing for you. First: do you already have a résumé?</p>
             <div className="opts">
               <button className="opt" onClick={() => chooseHas(true)}>
                 <span className="ic"><DocIcon size={16} /></span>
                 <span className="oc">
                   <span className="ot">Yes, I have a résumé</span>
-                  <span className="od">We&rsquo;ll turn it into your first version, ready to tailor.</span>
+                  <span className="od">We'll turn it into your first version, ready to tailor.</span>
                 </span>
                 <ChevronRightIcon size={16} className="chev" />
               </button>
@@ -90,7 +90,7 @@ export function OnboardingFlow({
                 <ChevronRightIcon size={16} className="chev" />
               </button>
             </div>
-            <button className="linklike manual" onClick={onStartBlank}>or I&rsquo;ll fill it in myself &rarr;</button>
+            <button className="linklike manual" onClick={onStartBlank}>or I'll fill it in myself →</button>
           </div>
         )}
 
@@ -104,7 +104,7 @@ export function OnboardingFlow({
                 <span className="ic"><SparkIcon size={16} /></span>
                 <span className="oc">
                   <span className="ot">Claude Pro or Max</span>
-                  <span className="od">Use your subscription. You&rsquo;ll paste a login token from <code>claude setup-token</code>.</span>
+                  <span className="od">Use your subscription. You'll paste a login token from <code>claude setup-token</code>.</span>
                 </span>
                 <ChevronRightIcon size={16} className="chev" />
               </button>
@@ -126,7 +126,7 @@ export function OnboardingFlow({
               </button>
             </div>
             <div className="back">
-              <button className="linklike" onClick={backToQ1}>&larr; Back</button>
+              <button className="linklike" onClick={backToQ1}>← Back</button>
             </div>
           </div>
         )}
@@ -139,7 +139,7 @@ export function OnboardingFlow({
             {crumbs}
             <h1 className="t">{ai === "pro" ? "Connect your Claude subscription" : "Connect your API key"}</h1>
             <p className="lead">Placeholder: implemented in a later task.</p>
-            <div className="back"><button className="linklike" onClick={backToQ2}>&larr; Back</button></div>
+            <div className="back"><button className="linklike" onClick={backToQ2}>← Back</button></div>
           </div>
         )}
 
@@ -151,7 +151,7 @@ export function OnboardingFlow({
             {crumbs}
             <h1 className="t">Copy this into any AI chat</h1>
             <p className="lead">Placeholder: implemented in a later task.</p>
-            <div className="back"><button className="linklike" onClick={backToQ2}>&larr; Back</button></div>
+            <div className="back"><button className="linklike" onClick={backToQ2}>← Back</button></div>
           </div>
         )}
       </div>
