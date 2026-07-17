@@ -13,6 +13,7 @@ import { OnboardingWizard } from "./components/OnboardingWizard";
 import { UserMenu } from "./components/UserMenu";
 import { Tour } from "./components/Tour";
 import { AuthScreen } from "./components/AuthScreen";
+import { Landing } from "./components/Landing";
 import { GitBranchIcon, MenuIcon, ResumeMark } from "./components/icons";
 import { branchName, ref } from "./lib/git";
 import { prefs } from "./lib/prefs";
@@ -122,7 +123,10 @@ export default function App() {
     await refresh(selected);
   };
 
-  if (needAuth) return <AuthScreen failed={new URLSearchParams(window.location.search).get("auth") === "failed"} />;
+  if (needAuth) {
+    const failed = new URLSearchParams(window.location.search).get("auth") === "failed";
+    return failed ? <AuthScreen failed /> : <Landing />;
+  }
   if (fatal) return <div style={{ padding: 24 }} className="err">{fatal}</div>;
 
   const empty = versions.length === 0;
