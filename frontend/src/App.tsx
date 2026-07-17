@@ -9,9 +9,6 @@ import { Compare } from "./components/Compare";
 import { NetworkGraph } from "./components/NetworkGraph";
 import { CommitModal } from "./components/CommitModal";
 import { Settings } from "./components/Settings";
-// OnboardingWizard.tsx is kept on disk until Task 9 removes it, but its
-// import here is retired now that OnboardingFlow replaces its usage below
-// (an unused import would fail the noUnusedLocals build gate).
 import { OnboardingFlow } from "./components/onboarding/OnboardingFlow";
 import { UserMenu } from "./components/UserMenu";
 import { Tour } from "./components/Tour";
@@ -171,7 +168,7 @@ export default function App() {
         {railOpen && (
           <aside className="sidebar">
             {empty ? (
-              <p className="muted" style={{ padding: "6px 10px" }}>No commits yet. Add your resume on the Edit tab, or import from the CLI.</p>
+              <p className="muted" style={{ padding: "6px 10px" }}>No versions yet. Add your resume on the Edit tab to get started.</p>
             ) : (
               <>
                 <BranchRail
@@ -227,7 +224,7 @@ export default function App() {
                 <NetworkGraph versions={versions} current={current} selected={selected} onSelect={setSelected} onOpen={setModalVersion} />
               </div>
             ) : (
-              <div className="content"><p className="muted">No commits yet.</p></div>
+              <div className="content"><p className="muted">No versions yet.</p></div>
             )
           ) : (
             <div className="content">
