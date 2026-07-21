@@ -9,10 +9,11 @@ import { Compare } from "./components/Compare";
 import { NetworkGraph } from "./components/NetworkGraph";
 import { CommitModal } from "./components/CommitModal";
 import { Settings } from "./components/Settings";
-import { OnboardingWizard } from "./components/OnboardingWizard";
+import { OnboardingFlow } from "./components/onboarding/OnboardingFlow";
 import { UserMenu } from "./components/UserMenu";
 import { Tour } from "./components/Tour";
 import { AuthScreen } from "./components/AuthScreen";
+import { Landing } from "./components/Landing";
 import { GitBranchIcon, MenuIcon, ResumeMark } from "./components/icons";
 import { branchName, ref } from "./lib/git";
 import { prefs } from "./lib/prefs";
@@ -62,6 +63,7 @@ export default function App() {
   const [needAuth, setNeedAuth] = useState(false);
   const [wizardDismissed, setWizardDismissed] = useState(false);
   const [tourActive, setTourActive] = useState(false);
+  const [pendingChatPrompt, setPendingChatPrompt] = useState<string | null>(null);
   const { theme, setTheme } = useTheme();
 
   const startTour = useCallback(() => { setView("edit"); setTourActive(true); }, []);
@@ -116,13 +118,26 @@ export default function App() {
     setMe(await api.me());
   };
 
+  // Onboarding connect hand-off: refetch `me` so the just-saved credential
+  // enables the agent chat, dismiss the wizard so it doesn't re-trigger on
+  // this still-empty account, and open Edit with the composer preloaded.
+  const onOpenAssistant = async (initialInput: string) => {
+    setMe(await api.me());
+    setWizardDismissed(true);
+    setPendingChatPrompt(initialInput);
+    setView("edit");
+  };
+
   const checkout = async () => {
     if (selected == null) return;
     await api.setCurrent(selected);
     await refresh(selected);
   };
 
-  if (needAuth) return <AuthScreen failed={new URLSearchParams(window.location.search).get("auth") === "failed"} />;
+  if (needAuth) {
+    const failed = new URLSearchParams(window.location.search).get("auth") === "failed";
+    return failed ? <AuthScreen /> : <Landing />;
+  }
   if (fatal) return <div style={{ padding: 24 }} className="err">{fatal}</div>;
 
   const empty = versions.length === 0;
@@ -153,7 +168,7 @@ export default function App() {
         {railOpen && (
           <aside className="sidebar">
             {empty ? (
-              <p className="muted" style={{ padding: "6px 10px" }}>No commits yet. Add your resume on the Edit tab, or import from the CLI.</p>
+              <p className="muted" style={{ padding: "6px 10px" }}>No versions yet. Add your resume on the Edit tab to get started.</p>
             ) : (
               <>
                 <BranchRail
@@ -184,13 +199,21 @@ export default function App() {
 
           {view === "edit" ? (
             showWizard ? (
-              <OnboardingWizard
+              <OnboardingFlow
                 onFinish={async (v) => { setWizardDismissed(true); await onCommitted(v); }}
                 onStartBlank={() => setWizardDismissed(true)}
+                onOpenAssistant={onOpenAssistant}
               />
             ) : editDetail ? (
               <div className="edit-fill">
-                <Workbench detail={editDetail} me={me} onCommitted={onCommitted} onMeChanged={async () => setMe(await api.me())} />
+                <Workbench
+                  detail={editDetail}
+                  me={me}
+                  onCommitted={onCommitted}
+                  onMeChanged={async () => setMe(await api.me())}
+                  initialChatInput={pendingChatPrompt ?? undefined}
+                  onInitialChatInputConsumed={() => setPendingChatPrompt(null)}
+                />
               </div>
             ) : (
               <div className="content"><p className="muted">Loading…</p></div>
@@ -201,7 +224,7 @@ export default function App() {
                 <NetworkGraph versions={versions} current={current} selected={selected} onSelect={setSelected} onOpen={setModalVersion} />
               </div>
             ) : (
-              <div className="content"><p className="muted">No commits yet.</p></div>
+              <div className="content"><p className="muted">No versions yet.</p></div>
             )
           ) : (
             <div className="content">

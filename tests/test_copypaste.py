@@ -33,6 +33,12 @@ async def client():
         yield c
 
 
+async def test_onboarding_build_route(client):
+    r = await client.get("/api/prompts/onboarding-build")
+    assert r.status_code == 200
+    assert "prompt" in r.json() and len(r.json()["prompt"]) > 200
+
+
 async def test_copy_prompt_requires_base_then_injects_jd(client):
     # No base yet -> 400 (the wizard's onboarding path handles the pre-base case).
     r = await client.post("/api/prompts/copy", json={"intent": "tailor", "jd_text": "JD"})

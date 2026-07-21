@@ -33,18 +33,31 @@ function Resizer({ onDrag }: { onDrag: (dx: number) => void }) {
  * context-aware commit bar, plus the Resume Assistant chat. Committing on a base
  * commit writes a new base (main); on a tailored branch it refines that branch.
  */
-export function Workbench({ detail, me, onCommitted, onMeChanged }: {
+export function Workbench({ detail, me, onCommitted, onMeChanged, initialChatInput, onInitialChatInputConsumed }: {
   detail: VersionDetail;
   me: Me | null;
   onCommitted: (v?: number) => void;
   onMeChanged: () => void | Promise<void>;
+  initialChatInput?: string;
+  onInitialChatInputConsumed?: () => void;
 }) {
   const [working, setWorking] = useState<Resume>(detail.data as Resume);
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  const [pane, setPane] = useState<"editor" | "preview" | "chat">("editor"); // narrow-screen toggle
-  const [chatOpen, setChatOpen] = useState(false); // wide-screen third column
+  // A pending prompt from the onboarding handoff forces the assistant open
+  // (and, on narrow screens, front-and-center) so the preloaded message is
+  // immediately visible rather than tucked behind a toggle.
+  const [pane, setPane] = useState<"editor" | "preview" | "chat">(initialChatInput ? "chat" : "editor"); // narrow-screen toggle
+  const [chatOpen, setChatOpen] = useState(() => !!initialChatInput); // wide-screen third column
+
+  // One-shot: consume the handoff prompt on mount so a later remount of this
+  // component (e.g. a tab round-trip that unmounts Workbench) doesn't see the
+  // still-set prop and re-force the assistant pane open / re-seed the composer.
+  useEffect(() => {
+    if (initialChatInput) onInitialChatInputConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Draggable pane widths (wide screens only; persisted).
   const wbRef = useRef<HTMLDivElement>(null);
@@ -153,6 +166,7 @@ export function Workbench({ detail, me, onCommitted, onMeChanged }: {
               onCreateBranch={createBranchFromChat}
               onRepoChanged={onCommitted}
               onMeChanged={onMeChanged}
+              initialInput={initialChatInput}
             />
           )}
         </div>
